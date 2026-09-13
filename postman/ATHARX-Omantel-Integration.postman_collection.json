@@ -1,0 +1,433 @@
+{
+  "info": {
+    "name": "ATHARX Omantel Integration API",
+    "description": "ATHARX customer-retention and rewards platform — sandbox/integration API contract (v1). This is ATHARX's own integration surface backed by a mock Omantel adapter; it is NOT an official Omantel API. Base URL for local development: http://localhost:3000/api/v1. Production placeholder: https://api.example-omantel-integration.com/api/v1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "atharx-omantel-integration-v1"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000/api/v1" },
+    { "key": "client_id", "value": "atharx-demo-client" },
+    { "key": "client_secret", "value": "atharx-demo-secret" },
+    { "key": "access_token", "value": "" },
+    { "key": "customer_id", "value": "" },
+    { "key": "subscriber_id", "value": "" },
+    { "key": "msisdn", "value": "+96890000000" },
+    { "key": "package_id", "value": "OMT-GOLD-05" },
+    { "key": "subscription_id", "value": "" },
+    { "key": "idempotency_key", "value": "" },
+    { "key": "lucky_draw_id", "value": "LD-2026-001" },
+    { "key": "spin_campaign_id", "value": "SPIN-DAILY-001" },
+    { "key": "spin_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Security & Identity",
+      "item": [
+        {
+          "name": "POST Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('access_token is present', () => pm.expect(body.access_token).to.be.a('string'));",
+                  "if (body.access_token) { pm.collectionVariables.set('access_token', body.access_token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": \"{{client_id}}\",\n  \"client_secret\": \"{{client_secret}}\",\n  \"grant_type\": \"client_credentials\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/token", "host": ["{{base_url}}"], "path": ["auth", "token"] },
+            "description": "Issues a mock OAuth2 client-credentials Bearer token. The test script automatically saves it to {{access_token}}."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product & Plan Query",
+      "item": [
+        {
+          "name": "GET Package Catalog",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('currency is OMR', () => pm.expect(body.currency).to.eql('OMR'));",
+                  "pm.test('has at least one package', () => pm.expect(body.packages.length).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/packages/catalog", "host": ["{{base_url}}"], "path": ["packages", "catalog"] },
+            "description": "Returns the Omantel prepaid package catalog (seed/demo data — not official Omantel pricing). Publicly readable; the Authorization header is accepted but not required."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscriber Management",
+      "item": [
+        {
+          "name": "GET Subscriber Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/subscribers/{{msisdn}}",
+              "host": ["{{base_url}}"],
+              "path": ["subscribers", "{{msisdn}}"]
+            },
+            "description": "Looks up an ATHARX subscriber/customer identity by MSISDN."
+          }
+        },
+        {
+          "name": "GET Subscription Status (by query)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/subscriptions/status?msisdn={{msisdn}}",
+              "host": ["{{base_url}}"],
+              "path": ["subscriptions", "status"],
+              "query": [{ "key": "msisdn", "value": "{{msisdn}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscription Provisioning",
+      "item": [
+        {
+          "name": "POST Subscribe Package",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('subscription is ACTIVE', () => pm.expect(body.status).to.eql('ACTIVE'));",
+                  "if (body.subscription_id) pm.collectionVariables.set('subscription_id', body.subscription_id);",
+                  "if (body.subscriber_id) pm.collectionVariables.set('subscriber_id', body.subscriber_id);",
+                  "if (body.customer_id) pm.collectionVariables.set('customer_id', body.customer_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Demo Customer\",\n  \"msisdn\": \"{{msisdn}}\",\n  \"package_id\": \"{{package_id}}\",\n  \"idempotency_key\": \"{{idempotency_key}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/subscriptions/subscribe",
+              "host": ["{{base_url}}"],
+              "path": ["subscriptions", "subscribe"]
+            },
+            "description": "Set {{idempotency_key}} to a unique value (e.g. REQ-<random>) before sending. Resubmitting the SAME idempotency_key returns the original transaction (is_replay=true) instead of creating a duplicate — try re-sending this exact request twice to see it in action."
+          }
+        },
+        {
+          "name": "POST Unsubscribe Package",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"msisdn\": \"{{msisdn}}\",\n  \"package_id\": \"{{package_id}}\",\n  \"reason\": \"user_request\",\n  \"idempotency_key\": \"REQ-UNSUB-{{$randomInt}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/subscriptions/unsubscribe",
+              "host": ["{{base_url}}"],
+              "path": ["subscriptions", "unsubscribe"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rewards",
+      "item": [
+        {
+          "name": "GET Reward Balance",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/rewards/balance/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["rewards", "balance", "{{customer_id}}"]
+            }
+          }
+        },
+        {
+          "name": "GET Reward Ledger",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/rewards/ledger/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["rewards", "ledger", "{{customer_id}}"]
+            }
+          }
+        },
+        {
+          "name": "GET Reward Milestones",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/rewards/milestones", "host": ["{{base_url}}"], "path": ["rewards", "milestones"] }
+          }
+        },
+        {
+          "name": "GET VIP Progress",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/rewards/vip/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["rewards", "vip", "{{customer_id}}"]
+            },
+            "description": "required_coins is data-driven (VIP-65 milestone record), not a hard-coded frontend constant."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lucky Draw",
+      "item": [
+        {
+          "name": "GET Active Lucky Draws",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/lucky-draws/active", "host": ["{{base_url}}"], "path": ["lucky-draws", "active"] }
+          }
+        },
+        {
+          "name": "GET Eligibility",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/lucky-draws/{{lucky_draw_id}}/eligibility/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["lucky-draws", "{{lucky_draw_id}}", "eligibility", "{{customer_id}}"]
+            },
+            "description": "Demo Campaign Rule: minimum_coins is configurable per lucky draw, not an official Omantel promotion."
+          }
+        },
+        {
+          "name": "POST Create Entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"customer_id\": \"{{customer_id}}\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/lucky-draws/{{lucky_draw_id}}/entries",
+              "host": ["{{base_url}}"],
+              "path": ["lucky-draws", "{{lucky_draw_id}}", "entries"]
+            }
+          }
+        },
+        {
+          "name": "GET My Entries",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/lucky-draws/{{lucky_draw_id}}/entries/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["lucky-draws", "{{lucky_draw_id}}", "entries", "{{customer_id}}"]
+            }
+          }
+        },
+        {
+          "name": "GET Winners",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/lucky-draws/{{lucky_draw_id}}/winners",
+              "host": ["{{base_url}}"],
+              "path": ["lucky-draws", "{{lucky_draw_id}}", "winners"]
+            },
+            "description": "Winner selection is always performed server-side (crypto-random, auditable via lucky_draw_runs) — never by the frontend."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Prizes",
+      "item": [
+        {
+          "name": "GET Prize Catalog",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/prizes", "host": ["{{base_url}}"], "path": ["prizes"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spin & Win",
+      "item": [
+        {
+          "name": "GET Spin Eligibility",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/spin/eligibility/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["spin", "eligibility", "{{customer_id}}"]
+            }
+          }
+        },
+        {
+          "name": "POST Execute Spin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('reward.amount is exactly 1 (server-enforced, never client-supplied)', () => pm.expect(body.reward.amount).to.eql(1));",
+                  "  if (body.spin_id) pm.collectionVariables.set('spin_id', body.spin_id);",
+                  "} else {",
+                  "  pm.test('cooldown response is 409 COOLDOWN_ACTIVE', () => {",
+                  "    pm.expect(pm.response.code).to.eql(409);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('COOLDOWN_ACTIVE');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"{{customer_id}}\",\n  \"campaign_id\": \"{{spin_campaign_id}}\",\n  \"idempotency_key\": \"SPIN-REQ-{{$randomInt}}\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/spin", "host": ["{{base_url}}"], "path": ["spin"] },
+            "description": "Every successful spin awards exactly 1 Coin, enforced server-side — any client-supplied reward amount is ignored. Re-run within 24 hours to see the 409 COOLDOWN_ACTIVE response."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers (ATHARX app)",
+      "item": [
+        {
+          "name": "POST Signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('exactly 1 Coin awarded', () => pm.expect(body.coins_awarded).to.eql(1));",
+                  "if (body.customer_id) pm.collectionVariables.set('customer_id', body.customer_id);",
+                  "if (body.subscriber_id) pm.collectionVariables.set('subscriber_id', body.subscriber_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Demo Customer\",\n  \"mobile\": \"{{msisdn}}\",\n  \"email\": \"demo+{{$randomInt}}@example.com\",\n  \"password\": \"Demo@123\",\n  \"confirmPassword\": \"Demo@123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/customers/signup", "host": ["{{base_url}}"], "path": ["customers", "signup"] },
+            "description": "ATHARX's own signup endpoint (not part of the Telenor-style telecom contract). Use a fresh mobile/email each run to avoid DUPLICATE_MOBILE/DUPLICATE_EMAIL — the {{$randomInt}} email variable helps, but {{msisdn}} should also be changed between full test runs."
+          }
+        },
+        {
+          "name": "GET Retention Profile (future churn model boundary)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/customers/{{customer_id}}/retention-profile",
+              "host": ["{{base_url}}"],
+              "path": ["customers", "{{customer_id}}", "retention-profile"]
+            },
+            "description": "Placeholder response shape for a future churn-prediction service. churn_probability/risk_segment/recommended_campaign are intentionally null in this MVP."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+          }
+        }
+      ]
+    }
+  ]
+}
