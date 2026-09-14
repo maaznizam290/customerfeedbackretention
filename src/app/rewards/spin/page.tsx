@@ -148,8 +148,24 @@ export default function SpinPage() {
       {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p>}
 
       <div className="mt-8 rounded-3xl border border-atharx-navy/10 bg-white p-6 shadow-card text-left">
-        <p className="font-black text-emerald-600">✓ Spin Available</p>
-        <p className="mt-1 text-sm text-atharx-navy/60">Today&apos;s Reward: 1–10 Coins — spin to reveal it</p>
+        {eligibility?.eligible ? (
+          <>
+            <p className="font-black text-emerald-600">✓ Spin Available</p>
+            <p className="mt-1 text-sm text-atharx-navy/60">Today&apos;s Reward: 1–10 Coins — spin to reveal it</p>
+          </>
+        ) : eligibility?.cooldown_active ? (
+          <>
+            <p className="font-black text-amber-600">⏳ Spin Locked</p>
+            <p className="mt-1 text-sm text-atharx-navy/60">
+              Your next spin unlocks once the current cooldown ends. Refresh this page after it passes.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="font-black text-atharx-navy/40">Checking eligibility…</p>
+            <p className="mt-1 text-sm text-atharx-navy/60">Today&apos;s Reward: 1–10 Coins — spin to reveal it</p>
+          </>
+        )}
       </div>
 
       <div className="mt-6 rounded-2xl border border-atharx-navy/10 bg-white p-5 text-left text-sm text-atharx-navy/60">
