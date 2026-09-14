@@ -169,7 +169,7 @@ describe("ATHARX API — signup + subscription + reward golden path", () => {
   });
 });
 
-describe("ATHARX API — spin cooldown over HTTP", () => {
+describe("ATHARX API — Spin & Win over HTTP (this demo build's cooldown is configured to 0)", () => {
   let customerId: string;
 
   beforeAll(async () => {
@@ -200,27 +200,42 @@ describe("ATHARX API — spin cooldown over HTTP", () => {
     expect([1, 2, 3, 5, 10]).toContain(json.reward.amount);
   });
 
-  it("blocks an immediate second spin with 409 COOLDOWN_ACTIVE", async () => {
+  it("remains eligible for an immediate second spin — this deployment's cooldown is 0", async () => {
+    const { json: eligibility } = await get(`/spin/eligibility/${customerId}`, {
+      Authorization: "Bearer mock_access_token",
+    });
+    expect(eligibility.eligible).toBe(true);
+    expect(eligibility.cooldown_active).toBe(false);
+
     const { status, json } = await post(
       "/spin",
       { customer_id: customerId, idempotency_key: `SPIN-API-2-${Date.now()}` },
       { Authorization: "Bearer mock_access_token" }
     );
-    expect(status).toBe(409);
-    expect(json.error.code).toBe("COOLDOWN_ACTIVE");
-    expect(json.next_spin_available_at).toBeTruthy();
+    expect(status).toBe(201);
+    expect([1, 2, 3, 5, 10]).toContain(json.reward.amount);
   });
 
-  it("ignores a client-supplied reward amount on retry with a fresh key", async () => {
+  it("ignores a client-supplied reward amount, on a fresh key, immediately after the previous spin", async () => {
     // Confirms the endpoint schema has no reward field to smuggle a value
-    // through; an unknown field is simply ignored by the validator.
-    const { status } = await post(
+    // through; an unknown field is simply ignored by the validator. Also
+    // re-confirms no cooldown blocks this third consecutive spin.
+    const { status, json } = await post(
       "/spin",
       { customer_id: customerId, idempotency_key: `SPIN-API-3-${Date.now()}`, reward_coins: 999 },
       { Authorization: "Bearer mock_access_token" }
     );
-    // Still cooling down from the earlier spin in this suite.
-    expect(status).toBe(409);
+    expect(status).toBe(201);
+    expect(json.reward.amount).not.toBe(999);
+    expect([1, 2, 3, 5, 10]).toContain(json.reward.amount);
+  });
+
+  it("still enforces idempotency: replaying the same key never grants a second Coin", async () => {
+    const key = `SPIN-API-IDEMPOTENT-${Date.now()}`;
+    const first = await post("/spin", { customer_id: customerId, idempotency_key: key }, { Authorization: "Bearer mock_access_token" });
+    const second = await post("/spin", { customer_id: customerId, idempotency_key: key }, { Authorization: "Bearer mock_access_token" });
+    expect(first.json.spin_id).toBe(second.json.spin_id);
+    expect(first.json.coin_balance).toBe(second.json.coin_balance);
   });
 });
 

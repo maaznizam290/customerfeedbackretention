@@ -290,7 +290,7 @@ UI component decides how many Coins anything is worth (Rule 4).
 | 7 | A failed subscription never grants the subscription reward | The reward credit only happens on the `ACTIVE` branch of `subscriptionService.subscribe`, strictly after the adapter reports success |
 | 8 | Cancelled/failed transactions are never treated as active | `findActiveByNormalizedMsisdn` / `findActiveByMsisdnAndPackage` filter on `status='ACTIVE'` explicitly |
 | — | Every completed spin awards a Coin amount matching the visually landed wheel segment, chosen from a fixed server-side prize table, server-enforced | `spinService.executeSpin` picks the landed index and its paired reward from `SEGMENT_LABELS`/`SEGMENT_REWARDS` in the same operation, never from client input; F1/iPhone-themed segments are Coin jackpots only — real premium prizes are granted exclusively through the Lucky Draw/Selection Engine |
-| — | One spin per 24 hours, computed from the actual spin timestamp | `next_spin_available_at = last_spin_at + cooldown_seconds`, computed and checked with the server clock inside a synchronous SQLite transaction |
+| — | The spin cooldown, whatever its configured length, is computed from the actual spin timestamp — never calendar midnight or a client-supplied time | `next_spin_available_at = last_spin_at + cooldown_seconds`, computed and checked with the server clock inside a synchronous SQLite transaction; `cooldown_seconds` is a `spin_campaigns` config value (currently seeded to `0` for this demo build, so the wheel is spinnable again immediately — the mechanism itself, and its 24-hour behavior, is unchanged and still covered by `tests/unit/spinService.test.ts`) |
 | — | Winner selection is server-side and auditable | `luckyDrawService.executeDraw` uses `crypto.randomInt`, persists `lucky_draw_runs` + `lucky_draw_winners`; no winner-picking logic exists in the frontend |
 | — | A Vault offer can be unlocked at most once per customer, and the Coin balance check + debit are atomic | `UNIQUE(offer_id, customer_id)` on `vault_redemptions` is the concurrency backstop; `vaultService.redeem` checks the balance and credits a negative reward row inside one transaction, so a customer can never be charged more Coins than they have |
 | 9 | A Token is never a stand-in for a Coin, and a behaviour is never hard-coded into UI | Distinct `tokens` / `behaviours` tables; `behaviourService.evaluate` reads a configurable `rule` JSON object, never an `if` statement tied to one campaign |
@@ -412,13 +412,14 @@ contrast; verify with a contrast checker before any palette change.
   over real HTTP against an isolated `next dev` instance + throwaway
   database — auth (token issuance, rejection, protected-route enforcement),
   public catalog browsing, the signup → subscribe → reward-ledger golden
-  path, idempotent replay, and the spin cooldown's `409 COOLDOWN_ACTIVE`
-  response.
+  path, idempotent replay, and (against this demo build's `cooldown_seconds:
+  0` config) that Spin & Win stays eligible across repeated back-to-back
+  spins while idempotency still holds.
 - **E2E test** (`tests/e2e`, `npm run test:e2e`): a single Playwright
   spec drives a real Chromium browser through the mandatory demo journey —
   signup, the +1 Coin modal, navbar update, package subscription, the +2
   Coin success screen, navbar reaching 3 Coins, VIP progress showing 3/65,
-  and a live spin resulting in a locked 24-hour cooldown state.
+  and a live spin that leaves the wheel immediately spinnable again.
 
 Manual QA also confirmed (via ad hoc browser automation during development):
 duplicate-email/duplicate-mobile signup rejection, invalid-mobile rejection,

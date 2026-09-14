@@ -630,8 +630,13 @@ const seedTx = db.transaction(() => {
 
   // ---- Spin campaign ----
   db.prepare(
+    // cooldown_seconds is 0 for this demo build so Spin & Win has no wait
+    // between spins — a config value, not a code change, per the existing
+    // "reward/cooldown amounts are always resolved from configurable data"
+    // rule; spinService's 24-hour cooldown mechanism itself is unchanged
+    // and still covered by its own tests at a non-zero cooldown.
     `INSERT INTO spin_campaigns (spin_campaign_id, name, status, spin_frequency, reward_coins, cooldown_seconds, max_spins_per_customer, start_date, end_date)
-     VALUES ('SPIN-DAILY-001', 'ATHARX Daily Spin', 'ACTIVE', 'DAILY', 1, 86400, 1, @now, NULL)`
+     VALUES ('SPIN-DAILY-001', 'ATHARX Daily Spin', 'ACTIVE', 'DAILY', 1, 0, 1, @now, NULL)`
   ).run({ now: now() });
 
   // ---- Demo customers, subscribers, subscriptions, rewards ----

@@ -23,13 +23,6 @@ function wheelBackground() {
   return `conic-gradient(${stops.join(", ")})`;
 }
 
-function formatCountdown(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  return `${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
-}
-
 export default function SpinPage() {
   const { session, loading: sessionLoading, refresh } = useSession();
   const { openSignup } = useSignupModal();
@@ -39,7 +32,6 @@ export default function SpinPage() {
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<ApiSpinResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [remainingSeconds, setRemainingSeconds] = useState(0);
   const idempotencyKeyRef = useRef(newIdempotencyKey("SPIN-REQ"));
 
   const loadEligibility = useCallback(async () => {
@@ -47,7 +39,6 @@ export default function SpinPage() {
     try {
       const data = await apiFetch<ApiSpinEligibility>(`/spin/eligibility/${session.customerId}`, { method: "GET" });
       setEligibility(data);
-      setRemainingSeconds(data.remaining_cooldown_seconds);
     } catch {
       setEligibility(null);
     }
@@ -56,21 +47,6 @@ export default function SpinPage() {
   useEffect(() => {
     loadEligibility();
   }, [loadEligibility]);
-
-  useEffect(() => {
-    if (!eligibility?.cooldown_active || remainingSeconds <= 0) return;
-    const timer = setInterval(() => {
-      setRemainingSeconds((s) => {
-        if (s <= 1) {
-          clearInterval(timer);
-          loadEligibility();
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [eligibility?.cooldown_active, remainingSeconds, loadEligibility]);
 
   async function handleSpin() {
     if (!session.customerId || spinning) return;
@@ -123,13 +99,13 @@ export default function SpinPage() {
   return (
     <main className="mx-auto max-w-xl px-4 py-14 text-center sm:px-6 lg:px-8">
       <h1 className="text-3xl font-black text-atharx-navy">🎡 Spin & Win</h1>
-      <p className="mt-1 text-sm text-atharx-navy/60">Complete your daily spin and earn 1–10 Coins.</p>
+      <p className="mt-1 text-sm text-atharx-navy/60">Spin anytime and earn 1–10 Coins.</p>
       <p className="mt-3 text-lg font-bold text-atharx-navy">🪙 {session.coinBalance} Coins</p>
 
-      <div className="relative mx-auto mt-10 flex h-72 w-72 items-center justify-center">
-        <div className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 text-3xl">🔻</div>
+      <div className="relative mx-auto mt-10 flex h-[420px] w-[420px] items-center justify-center">
+        <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 text-4xl">🔻</div>
         <div
-          className="h-64 w-64 rounded-full border-[6px] border-white shadow-2xl transition-transform"
+          className="h-[380px] w-[380px] rounded-full border-[8px] border-white shadow-2xl transition-transform"
           style={{
             background: wheelBackground(),
             transform: `rotate(${rotation}deg)`,
@@ -146,11 +122,11 @@ export default function SpinPage() {
             return (
               <div
                 key={i}
-                className="absolute left-1/2 top-1/2 h-1/2 origin-top text-[9px] font-black leading-tight text-white"
+                className="absolute left-1/2 top-1/2 h-1/2 origin-top text-[13px] font-black leading-tight text-white"
                 style={{ transform: `rotate(${spokeAngle}deg)` }}
               >
                 <span
-                  className="absolute left-1/2 top-16 w-14 text-center"
+                  className="absolute left-1/2 top-[95px] w-20 text-center"
                   style={{ transform: `translateX(-50%) rotate(${upsideDown ? 180 : 0}deg)` }}
                 >
                   {label}
@@ -163,7 +139,7 @@ export default function SpinPage() {
           type="button"
           onClick={handleSpin}
           disabled={!eligible}
-          className="absolute flex h-20 w-20 items-center justify-center rounded-full bg-white text-sm font-black text-atharx-navy shadow-xl transition disabled:cursor-not-allowed disabled:opacity-70"
+          className="absolute flex h-28 w-28 items-center justify-center rounded-full bg-white text-base font-black text-atharx-navy shadow-xl transition disabled:cursor-not-allowed disabled:opacity-70"
         >
           {spinning ? "Spinning..." : "SPIN"}
         </button>
@@ -172,30 +148,17 @@ export default function SpinPage() {
       {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p>}
 
       <div className="mt-8 rounded-3xl border border-atharx-navy/10 bg-white p-6 shadow-card text-left">
-        {eligibility?.cooldown_active ? (
-          <>
-            <p className="font-black text-atharx-navy">⏳ Spin Locked</p>
-            <p className="mt-1 text-sm text-atharx-navy/60">
-              Next spin available in: <span className="font-bold text-atharx-navy">{formatCountdown(remainingSeconds)}</span>
-            </p>
-            <p className="mt-1 text-xs text-atharx-navy/40">Come back when the timer reaches zero.</p>
-          </>
-        ) : (
-          <>
-            <p className="font-black text-emerald-600">✓ Spin Available</p>
-            <p className="mt-1 text-sm text-atharx-navy/60">Today&apos;s Reward: 1–10 Coins — spin to reveal it</p>
-          </>
-        )}
+        <p className="font-black text-emerald-600">✓ Spin Available</p>
+        <p className="mt-1 text-sm text-atharx-navy/60">Today&apos;s Reward: 1–10 Coins — spin to reveal it</p>
       </div>
 
       <div className="mt-6 rounded-2xl border border-atharx-navy/10 bg-white p-5 text-left text-sm text-atharx-navy/60">
         <p className="font-bold text-atharx-navy">How Spin &amp; Win works</p>
         <ol className="mt-2 list-decimal space-y-1 pl-4">
-          <li>You receive one eligible spin per day.</li>
+          <li>Spin anytime — there&apos;s no waiting period in this demo.</li>
           <li>Complete the spin to earn 1–10 Coins, depending on the wheel segment.</li>
           <li>F1/iPhone-themed segments are bonus Coin jackpots, not an instant physical prize — those are awarded exclusively through the audited Lucky Draw.</li>
           <li>Your Coin is added automatically to your ATHARX balance.</li>
-          <li>Return after 24 hours for another eligible spin.</li>
           <li>Campaign eligibility and terms apply.</li>
         </ol>
       </div>

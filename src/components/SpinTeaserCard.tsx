@@ -13,8 +13,8 @@ export function SpinTeaserCard() {
         <span className="text-2xl">🎡</span>
         <p className="text-xs font-black uppercase tracking-widest text-atharx-teal">Spin & Win</p>
       </div>
-      <h3 className="mt-2 text-xl font-black text-atharx-navy">Complete your daily spin and earn up to 10 Coins</h3>
-      <p className="mt-1.5 text-sm text-atharx-navy/60">Come back every day for another eligible spin.</p>
+      <h3 className="mt-2 text-xl font-black text-atharx-navy">Spin anytime and earn up to 10 Coins</h3>
+      <p className="mt-1.5 text-sm text-atharx-navy/60">No waiting period in this demo — spin again right away.</p>
       <Link
         href="/rewards/spin"
         className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-atharx-navy py-3 text-sm font-bold text-white shadow-card transition hover:bg-atharx-navy2"

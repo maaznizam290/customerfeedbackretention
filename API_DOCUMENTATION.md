@@ -415,11 +415,19 @@ in the response body.
 // Response 201
 {
   "success": true, "spin_id": "SPIN-TXN-000001", "status": "COMPLETED",
-  "landed_segment": "LUCKY", "reward": { "type": "COIN", "amount": 1 },
+  "landed_segment": "3 COINS", "reward": { "type": "COIN", "amount": 3 },
   "coin_balance": 4, "last_spin_at": "2026-09-13T10:30:00.000Z",
-  "next_spin_available_at": "2026-09-14T10:30:00.000Z", "cooldown_seconds": 86400
+  "next_spin_available_at": "2026-09-13T10:30:00.000Z", "cooldown_seconds": 0
 }
 ```
+
+This example shows the general shape of the response with a nonzero
+cooldown; **this demo build's `spin_campaigns.cooldown_seconds` is
+seeded to `0`**, so `next_spin_available_at` is effectively immediate and
+`GET /spin/eligibility/{customer_id}` returns `eligible: true` again right
+away — the cooldown mechanism itself (and a real deployment's ability to
+set it to 24 hours or any other value) is unchanged and still covered by
+`tests/unit/spinService.test.ts` at a nonzero cooldown.
 
 **Mandatory rule:** a completed spin always awards the Coin amount from a
 fixed, server-side prize table (`1`/`2`/`3`/`5`/`10` Coins) that exactly
@@ -430,11 +438,13 @@ Coins: a real physical or premium prize is only ever granted through the
 audited Lucky Draw / Selection Engine elsewhere in the app, never as an
 instant random spin outcome — presenting Spin & Win as capable of an
 instant guaranteed iPhone/F1-ticket win would misrepresent the mechanic.
-The 24-hour cooldown is computed from the server's own clock at the moment
-the spin completes (`last_spin_at + cooldown_seconds`), never from calendar
+Whatever length the cooldown is configured to (`spin_campaigns.cooldown_seconds`
+— `0` in this demo build, `86400` for a 24-hour cooldown in a production-style
+deployment), it is computed from the server's own clock at the moment the
+spin completes (`last_spin_at + cooldown_seconds`), never from calendar
 midnight and never trusting a client-supplied timestamp.
 
-If called again before the cooldown elapses:
+At a nonzero cooldown, calling again before it elapses returns:
 
 ```json
 // 409 Conflict

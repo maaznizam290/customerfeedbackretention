@@ -15,13 +15,13 @@ resolved by a transparent, server-side Selection Engine. See
 Token vs. Coin vs. Entry vs. Reward vs. Prize distinction.
 
 The original Coin-based reward economy — signup bonuses, package subscription
-rewards, a VIP milestone, an auditable Lucky Draw, and a daily Spin & Win —
+rewards, a VIP milestone, an auditable Lucky Draw, and a Spin & Win wheel —
 sits on top of a mock Omantel prepaid subscription flow, so the whole
 customer journey (subscribe → earn → engage → stay) can be demonstrated end
 to end without any live Omantel integration. The **ATHARX Vault** (`/vault`)
 adds a spend side to that economy: a catalog of Oman restaurants, hotels/
 resorts, parks, and premium experiences, each unlocked by spending Coins for
-a 20–30% discount — the first place in ATHARX Coins are ever spent rather
+a 20–50% discount — the first place in ATHARX Coins are ever spent rather
 than earned. A separate **ATHARX Control Panel** (`/control`) lets an admin
 configure behaviours, launch campaigns, generate simulated customers, and
 run winner selection — the same engine a real Omantel event system could

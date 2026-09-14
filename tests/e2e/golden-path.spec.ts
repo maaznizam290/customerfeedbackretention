@@ -3,7 +3,8 @@ import { test, expect } from "@playwright/test";
 // Mirrors the mandatory demo journey (spec section 45/87):
 // Signup -> +1 Coin -> OK -> Navbar 1 Coin -> Packages -> Gold OMR 5 ->
 // Consumer Name + Mobile -> Subscribe -> ACTIVE -> +2 Coins -> Navbar 3 Coins
-// -> VIP progress reflects the new balance -> Spin & Win locks after use.
+// -> VIP progress reflects the new balance -> Spin & Win (no cooldown in
+// this demo build, so the wheel is immediately spinnable again).
 
 test("full ATHARX demo journey: signup, reward, subscribe, spin", async ({ page }) => {
   const unique = Date.now();
@@ -61,18 +62,20 @@ test("full ATHARX demo journey: signup, reward, subscribe, spin", async ({ page 
   await primaryNav.getByRole("link", { name: "Rewards", exact: true }).click();
   await expect(page.getByText("3 / 65 Coins")).toBeVisible();
 
-  // --- Spin & Win: spin once, then it locks with a countdown ---
+  // --- Spin & Win: spin once, and it's immediately spinnable again ---
   // The reward is a server-determined amount from a fixed prize table
   // (1/2/3/5/10 Coins) matching whichever wheel segment it lands on, so the
   // exact amount isn't asserted here — only that it's a valid prize and the
   // navbar balance increases by exactly that much.
   await primaryNav.getByRole("link", { name: "Spin & Win" }).click();
-  await page.getByRole("button", { name: "SPIN" }).click();
+  const spinButton = page.getByRole("button", { name: "SPIN" });
+  await spinButton.click();
   await expect(dialog.getByText("Congratulations!")).toBeVisible({ timeout: 8000 });
   const spinRewardText = await dialog.getByText(/🪙 \+\d+ Coins?/).first().textContent();
   const spinReward = Number(spinRewardText?.match(/\d+/)?.[0]);
   expect([1, 2, 3, 5, 10]).toContain(spinReward);
   await dialog.getByRole("button", { name: "Done" }).click();
   await expect(page.getByText(`${3 + spinReward} Coins`, { exact: true })).toBeVisible();
-  await expect(page.getByText("Spin Locked")).toBeVisible();
+  await expect(page.getByText("Spin Available")).toBeVisible();
+  await expect(spinButton).toBeEnabled();
 });
