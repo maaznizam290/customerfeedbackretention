@@ -62,11 +62,17 @@ test("full ATHARX demo journey: signup, reward, subscribe, spin", async ({ page 
   await expect(page.getByText("3 / 65 Coins")).toBeVisible();
 
   // --- Spin & Win: spin once, then it locks with a countdown ---
+  // The reward is a server-determined amount from a fixed prize table
+  // (1/2/3/5/10 Coins) matching whichever wheel segment it lands on, so the
+  // exact amount isn't asserted here — only that it's a valid prize and the
+  // navbar balance increases by exactly that much.
   await primaryNav.getByRole("link", { name: "Spin & Win" }).click();
   await page.getByRole("button", { name: "SPIN" }).click();
   await expect(dialog.getByText("Congratulations!")).toBeVisible({ timeout: 8000 });
-  await expect(dialog.getByText(/\+1 Coin/).first()).toBeVisible();
+  const spinRewardText = await dialog.getByText(/🪙 \+\d+ Coins?/).first().textContent();
+  const spinReward = Number(spinRewardText?.match(/\d+/)?.[0]);
+  expect([1, 2, 3, 5, 10]).toContain(spinReward);
   await dialog.getByRole("button", { name: "Done" }).click();
-  await expect(page.getByText("4 Coins", { exact: true })).toBeVisible();
+  await expect(page.getByText(`${3 + spinReward} Coins`, { exact: true })).toBeVisible();
   await expect(page.getByText("Spin Locked")).toBeVisible();
 });

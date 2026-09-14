@@ -37,27 +37,41 @@ describe("spinService — 24 hour cooldown (mandatory acceptance criterion)", ()
     expect(spinService.getEligibility(customerId).eligible).toBe(true);
   });
 
-  it("awards exactly 1 Coin regardless of wheel segment, every time", () => {
+  const VALID_SPIN_REWARDS = [1, 2, 3, 5, 10];
+
+  it("always awards a Coin amount from the fixed, server-side prize table — never a client-influenced value", () => {
     const customerId = makeCustomer();
+    let expectedBalance = 0;
     for (let i = 0; i < 5; i++) {
       const spin = spinService.executeSpin({
         customerId,
         subscriberId: null,
         idempotencyKey: `SPIN-REQ-${customerId}-${i}`,
       });
-      expect(spin.rewardCoins).toBe(1);
+      expect(VALID_SPIN_REWARDS).toContain(spin.rewardCoins);
+      expectedBalance += spin.rewardCoins;
       vi.setSystemTime(new Date(Date.now() + 24 * 60 * 60 * 1000 + 1000));
     }
-    expect(rewardService.getBalance(customerId)).toBe(5);
+    expect(rewardService.getBalance(customerId)).toBe(expectedBalance);
+  });
+
+  it("credits Coins that match the visually landed wheel segment (never a mismatched amount)", () => {
+    const customerId = makeCustomer();
+    const spin = spinService.executeSpin({ customerId, subscriberId: null, idempotencyKey: `SPIN-MATCH-${customerId}` });
+    if (spin.landedSegment.includes("BONUS")) {
+      expect(spin.rewardCoins).toBe(10);
+    } else {
+      expect(spin.landedSegment).toBe(`${spin.rewardCoins} ${spin.rewardCoins === 1 ? "COIN" : "COINS"}`);
+    }
   });
 
   it("blocks an immediate second spin with COOLDOWN_ACTIVE", () => {
     const customerId = makeCustomer();
-    spinService.executeSpin({ customerId, subscriberId: null, idempotencyKey: `SPIN-A-${customerId}` });
+    const first = spinService.executeSpin({ customerId, subscriberId: null, idempotencyKey: `SPIN-A-${customerId}` });
     expect(() =>
       spinService.executeSpin({ customerId, subscriberId: null, idempotencyKey: `SPIN-B-${customerId}` })
     ).toThrow(SpinCooldownActiveError);
-    expect(rewardService.getBalance(customerId)).toBe(1);
+    expect(rewardService.getBalance(customerId)).toBe(first.rewardCoins);
   });
 
   it("stays blocked 23 hours 59 minutes later", () => {
@@ -73,8 +87,8 @@ describe("spinService — 24 hour cooldown (mandatory acceptance criterion)", ()
     vi.setSystemTime(new Date(new Date(first.nextSpinAvailableAt).getTime()));
     expect(spinService.getEligibility(customerId).eligible).toBe(true);
     const second = spinService.executeSpin({ customerId, subscriberId: null, idempotencyKey: `SPIN-C-${customerId}` });
-    expect(second.rewardCoins).toBe(1);
-    expect(rewardService.getBalance(customerId)).toBe(2);
+    expect(VALID_SPIN_REWARDS).toContain(second.rewardCoins);
+    expect(rewardService.getBalance(customerId)).toBe(first.rewardCoins + second.rewardCoins);
   });
 
   it("computes the cooldown from the actual spin timestamp, not calendar midnight", () => {
@@ -90,7 +104,7 @@ describe("spinService — 24 hour cooldown (mandatory acceptance criterion)", ()
     const first = spinService.executeSpin({ customerId, subscriberId: null, idempotencyKey: "SPIN-DUP" });
     const second = spinService.executeSpin({ customerId, subscriberId: null, idempotencyKey: "SPIN-DUP" });
     expect(second.spinId).toBe(first.spinId);
-    expect(rewardService.getBalance(customerId)).toBe(1);
+    expect(rewardService.getBalance(customerId)).toBe(first.rewardCoins);
   });
 
   it("never honors a client-supplied reward amount — the service signature has no such input", () => {
@@ -102,7 +116,8 @@ describe("spinService — 24 hour cooldown (mandatory acceptance criterion)", ()
       rewardCoins: 100,
       idempotencyKey: "SPIN-HACK",
     });
-    expect(spin.rewardCoins).toBe(1);
+    expect(spin.rewardCoins).not.toBe(100);
+    expect(VALID_SPIN_REWARDS).toContain(spin.rewardCoins);
   });
 
   it("serializes concurrent spin attempts so only one succeeds (no double award)", () => {
@@ -119,6 +134,7 @@ describe("spinService — 24 hour cooldown (mandatory acceptance criterion)", ()
     });
     const succeeded = results.filter((r) => !(r instanceof Error));
     expect(succeeded).toHaveLength(1);
-    expect(rewardService.getBalance(customerId)).toBe(1);
+    const [winner] = succeeded as Array<{ rewardCoins: number }>;
+    expect(rewardService.getBalance(customerId)).toBe(winner.rewardCoins);
   });
 });

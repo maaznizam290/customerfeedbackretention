@@ -190,14 +190,14 @@ describe("ATHARX API — spin cooldown over HTTP", () => {
     expect(json.eligible).toBe(true);
   });
 
-  it("awards exactly 1 Coin per spin", async () => {
+  it("awards a Coin amount from the server-side prize table, matching the landed segment", async () => {
     const { status, json } = await post(
       "/spin",
       { customer_id: customerId, idempotency_key: `SPIN-API-${Date.now()}` },
       { Authorization: "Bearer mock_access_token" }
     );
     expect(status).toBe(201);
-    expect(json.reward.amount).toBe(1);
+    expect([1, 2, 3, 5, 10]).toContain(json.reward.amount);
   });
 
   it("blocks an immediate second spin with 409 COOLDOWN_ACTIVE", async () => {
@@ -211,7 +211,7 @@ describe("ATHARX API — spin cooldown over HTTP", () => {
     expect(json.next_spin_available_at).toBeTruthy();
   });
 
-  it("ignores a client-supplied reward amount and still awards 1 Coin on retry with a fresh key", async () => {
+  it("ignores a client-supplied reward amount on retry with a fresh key", async () => {
     // Confirms the endpoint schema has no reward field to smuggle a value
     // through; an unknown field is simply ignored by the validator.
     const { status } = await post(

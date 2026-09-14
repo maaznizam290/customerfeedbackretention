@@ -359,12 +359,18 @@ Apple-sponsored promotions.
 }
 ```
 
-**Mandatory rule:** a completed spin always awards **exactly 1 Coin**,
-regardless of which visual wheel segment it lands on, and regardless of
-anything the client sends. The 24-hour cooldown is computed from the
-server's own clock at the moment the spin completes (`last_spin_at +
-cooldown_seconds`), never from calendar midnight and never trusting a
-client-supplied timestamp.
+**Mandatory rule:** a completed spin always awards the Coin amount from a
+fixed, server-side prize table (`1`/`2`/`3`/`5`/`10` Coins) that exactly
+matches whichever wheel segment it visually lands on — the client never
+supplies, influences, or can predict either the segment or the amount.
+Two segments borrow F1/iPhone theming for excitement, but always resolve to
+Coins: a real physical or premium prize is only ever granted through the
+audited Lucky Draw / Selection Engine elsewhere in the app, never as an
+instant random spin outcome — presenting Spin & Win as capable of an
+instant guaranteed iPhone/F1-ticket win would misrepresent the mechanic.
+The 24-hour cooldown is computed from the server's own clock at the moment
+the spin completes (`last_spin_at + cooldown_seconds`), never from calendar
+midnight and never trusting a client-supplied timestamp.
 
 If called again before the cooldown elapses:
 

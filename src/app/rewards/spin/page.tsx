@@ -7,9 +7,12 @@ import { useSignupModal } from "@/hooks/useSignupModal";
 import { Modal } from "@/components/Modal";
 import type { ApiSpinEligibility, ApiSpinResult } from "@/types/api";
 
-const SEGMENTS = ["COIN", "BONUS", "LUCKY", "REWARD", "COIN", "BONUS", "SPECIAL", "COIN"];
+// Must stay in the same order as SEGMENT_LABELS in spinService.ts — the
+// server returns landed_segment as one of these exact strings, and the
+// wheel rotates to whichever index matches it.
+const SEGMENTS = ["1 COIN", "2 COINS", "1 COIN", "F1 BONUS", "1 COIN", "3 COINS", "iPHONE BONUS", "5 COINS"];
 const SEGMENT_ANGLE = 360 / SEGMENTS.length;
-const SEGMENT_COLORS = ["#0B1D3A", "#00C2A8", "#0F2A52", "#00E0B8", "#0B1D3A", "#00C2A8", "#F2B705", "#0B1D3A"];
+const SEGMENT_COLORS = ["#0B1D3A", "#00C2A8", "#0F2A52", "#F2B705", "#0B1D3A", "#00C2A8", "#F2B705", "#00E0B8"];
 
 function wheelBackground() {
   const stops = SEGMENTS.map((_, i) => {
@@ -120,7 +123,7 @@ export default function SpinPage() {
   return (
     <main className="mx-auto max-w-xl px-4 py-14 text-center sm:px-6 lg:px-8">
       <h1 className="text-3xl font-black text-atharx-navy">🎡 Spin & Win</h1>
-      <p className="mt-1 text-sm text-atharx-navy/60">Complete your daily spin and earn 1 Coin.</p>
+      <p className="mt-1 text-sm text-atharx-navy/60">Complete your daily spin and earn 1–10 Coins.</p>
       <p className="mt-3 text-lg font-bold text-atharx-navy">🪙 {session.coinBalance} Coins</p>
 
       <div className="relative mx-auto mt-10 flex h-72 w-72 items-center justify-center">
@@ -134,15 +137,27 @@ export default function SpinPage() {
             transitionTimingFunction: "cubic-bezier(0.17, 0.67, 0.16, 0.99)",
           }}
         >
-          {SEGMENTS.map((label, i) => (
-            <div
-              key={i}
-              className="absolute left-1/2 top-1/2 h-1/2 origin-top text-[11px] font-black text-white"
-              style={{ transform: `rotate(${i * SEGMENT_ANGLE + SEGMENT_ANGLE / 2}deg)` }}
-            >
-              <span className="absolute left-1/2 top-4 -translate-x-1/2">{label}</span>
-            </div>
-          ))}
+          {SEGMENTS.map((label, i) => {
+            const spokeAngle = i * SEGMENT_ANGLE + SEGMENT_ANGLE / 2;
+            // Labels on the bottom half of the wheel point "outward" toward
+            // the rim just like the top half, which reads upside-down to the
+            // viewer — flip those 180° so every segment stays legible.
+            const upsideDown = spokeAngle > 90 && spokeAngle < 270;
+            return (
+              <div
+                key={i}
+                className="absolute left-1/2 top-1/2 h-1/2 origin-top text-[9px] font-black leading-tight text-white"
+                style={{ transform: `rotate(${spokeAngle}deg)` }}
+              >
+                <span
+                  className="absolute left-1/2 top-16 w-14 text-center"
+                  style={{ transform: `translateX(-50%) rotate(${upsideDown ? 180 : 0}deg)` }}
+                >
+                  {label}
+                </span>
+              </div>
+            );
+          })}
         </div>
         <button
           type="button"
@@ -168,7 +183,7 @@ export default function SpinPage() {
         ) : (
           <>
             <p className="font-black text-emerald-600">✓ Spin Available</p>
-            <p className="mt-1 text-sm text-atharx-navy/60">Today&apos;s Reward: +1 Coin</p>
+            <p className="mt-1 text-sm text-atharx-navy/60">Today&apos;s Reward: 1–10 Coins — spin to reveal it</p>
           </>
         )}
       </div>
@@ -177,7 +192,8 @@ export default function SpinPage() {
         <p className="font-bold text-atharx-navy">How Spin &amp; Win works</p>
         <ol className="mt-2 list-decimal space-y-1 pl-4">
           <li>You receive one eligible spin per day.</li>
-          <li>Complete the spin to earn 1 Coin.</li>
+          <li>Complete the spin to earn 1–10 Coins, depending on the wheel segment.</li>
+          <li>F1/iPhone-themed segments are bonus Coin jackpots, not an instant physical prize — those are awarded exclusively through the audited Lucky Draw.</li>
           <li>Your Coin is added automatically to your ATHARX balance.</li>
           <li>Return after 24 hours for another eligible spin.</li>
           <li>Campaign eligibility and terms apply.</li>
@@ -198,9 +214,11 @@ function SpinResultModal({ result, onClose }: { result: ApiSpinResult; onClose: 
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-4xl">🎉</div>
         <h2 className="mt-3 text-xl font-black text-atharx-navy">Congratulations!</h2>
         <p className="mt-1 text-sm text-atharx-navy/60">
-          You landed on {result.landed_segment} — +{result.reward.amount} Coin earned!
+          You landed on {result.landed_segment} — +{result.reward.amount} {result.reward.amount === 1 ? "Coin" : "Coins"} earned!
         </p>
-        <p className="mt-3 text-2xl font-black text-amber-600">🪙 +{result.reward.amount} Coin</p>
+        <p className="mt-3 text-2xl font-black text-amber-600">
+          🪙 +{result.reward.amount} {result.reward.amount === 1 ? "Coin" : "Coins"}
+        </p>
         <p className="mt-3 rounded-2xl bg-atharx-cloud px-4 py-3 text-sm font-bold text-atharx-navy">
           Your Coin balance is now {result.coin_balance}
         </p>

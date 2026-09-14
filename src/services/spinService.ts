@@ -20,10 +20,20 @@ export class NoActiveSpinCampaignError extends AppError {
   }
 }
 
-// Visual-only wheel segments. Whatever the wheel lands on, the reward is
-// always exactly SPIN_REWARD_COINS (enforced server-side below) — segment
-// labels never carry a different Coin amount.
-const VISUAL_SEGMENTS = ["COIN", "BONUS", "LUCKY", "REWARD", "COIN", "BONUS", "SPECIAL", "COIN"];
+/**
+ * The prize table for Spin & Win. Each index pairs a wheel label with the
+ * exact Coin amount that landing on it credits — the wheel never shows a
+ * number it doesn't pay out. The two "jackpot" segments borrow F1/iPhone
+ * theming for excitement, but always resolve to Coins: a real physical or
+ * premium prize (iPhone, F1 experience) is only ever granted through the
+ * audited Lucky Draw / Selection Engine elsewhere in the app, never as an
+ * instant random spin outcome — that would read as a guaranteed-win
+ * giveaway, which the responsible-gamification rules for this MVP
+ * explicitly rule out. The landed index (and therefore the reward) is
+ * chosen server-side only; a client can never influence or pre-see it.
+ */
+const SEGMENT_LABELS = ["1 COIN", "2 COINS", "1 COIN", "F1 BONUS", "1 COIN", "3 COINS", "iPHONE BONUS", "5 COINS"];
+const SEGMENT_REWARDS = [1, 2, 1, 10, 1, 3, 10, 5];
 
 export interface SpinEligibility {
   eligible: boolean;
@@ -110,17 +120,19 @@ export const spinService = {
         }
       }
 
-      // Server determines the reward amount unconditionally; any client-sent
-      // reward value is ignored entirely (never read here).
-      const rewardCoins = campaign.rewardCoins;
+      // Server determines both the landed segment AND the reward amount
+      // unconditionally; any client-sent reward value is ignored entirely
+      // (never read here). The two are drawn from the same index so the
+      // credited Coins always match what the wheel visually landed on.
+      const landedIndex = Math.floor(Math.random() * SEGMENT_LABELS.length);
+      const landedSegment = SEGMENT_LABELS[landedIndex];
+      const rewardCoins = SEGMENT_REWARDS[landedIndex];
       const reward = rewardService.creditReward({
         customerId: input.customerId,
         rewardType: "SPIN_REWARD",
         coins: rewardCoins,
         description: "ATHARX Daily Spin Reward",
       });
-
-      const landedSegment = VISUAL_SEGMENTS[Math.floor(Math.random() * VISUAL_SEGMENTS.length)];
       const nextSpinAvailableAt = new Date(now.getTime() + campaign.cooldownSeconds * 1000).toISOString();
 
       return spinRepository.create({

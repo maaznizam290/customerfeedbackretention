@@ -13,7 +13,7 @@ export function SpinTeaserCard() {
         <span className="text-2xl">🎡</span>
         <p className="text-xs font-black uppercase tracking-widest text-atharx-teal">Spin & Win</p>
       </div>
-      <h3 className="mt-2 text-xl font-black text-atharx-navy">Complete your daily spin and earn 1 Coin</h3>
+      <h3 className="mt-2 text-xl font-black text-atharx-navy">Complete your daily spin and earn up to 10 Coins</h3>
       <p className="mt-1.5 text-sm text-atharx-navy/60">Come back every day for another eligible spin.</p>
       <Link
         href="/rewards/spin"
