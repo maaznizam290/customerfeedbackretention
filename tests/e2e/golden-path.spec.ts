@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 
 // Mirrors the mandatory demo journey (spec section 45/87):
-// Signup -> +1 Coin -> OK -> Navbar 1 Coin -> Packages -> Gold OMR 5 ->
-// Consumer Name + Mobile -> Subscribe -> ACTIVE -> +2 Coins -> Navbar 3 Coins
-// -> VIP progress reflects the new balance -> Spin & Win (no cooldown in
-// this demo build, so the wheel is immediately spinnable again).
+// Signup -> 0 Coins, no reward modal -> Packages -> Gold OMR 5 -> Consumer
+// Name + Mobile -> Subscribe -> ACTIVE -> +2 Coins -> Navbar 2 Coins -> VIP
+// progress reflects the new balance -> Spin & Win (no cooldown in this demo
+// build, so the wheel is immediately spinnable again).
 
 test("full ATHARX demo journey: signup, reward, subscribe, spin", async ({ page }) => {
   const unique = Date.now();
@@ -25,13 +25,10 @@ test("full ATHARX demo journey: signup, reward, subscribe, spin", async ({ page 
   await page.locator("#confirmPassword").fill("Demo@123");
   await page.getByRole("button", { name: "Create Account" }).last().click();
 
-  // --- Reward modal: Congratulations! +1 Coin ---
-  await expect(dialog.getByText("Congratulations!")).toBeVisible();
-  await expect(dialog.getByText("+1 Coin", { exact: true })).toBeVisible();
-  await dialog.getByRole("button", { name: "OK" }).click();
-
-  // --- Navbar now shows 1 Coin ---
-  await expect(page.getByText("1 Coin", { exact: true })).toBeVisible();
+  // --- No reward modal on signup: a new customer starts at 0 Coins, and
+  // nothing is credited until they actually earn it (subscribe, spin, etc).
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("0 Coins", { exact: true })).toBeVisible();
 
   // --- Browse Omantel Prepaid Packages ---
   await primaryNav.getByRole("link", { name: "Prepaid Packages" }).click();
@@ -55,12 +52,12 @@ test("full ATHARX demo journey: signup, reward, subscribe, spin", async ({ page 
   await expect(dialog.getByText("+2 Coins")).toBeVisible();
   await dialog.getByRole("button", { name: "Close" }).click();
 
-  // --- Navbar balance = 3 Coins ---
-  await expect(page.getByText("3 Coins", { exact: true })).toBeVisible();
+  // --- Navbar balance = 2 Coins ---
+  await expect(page.getByText("2 Coins", { exact: true })).toBeVisible();
 
-  // --- VIP progress reflects 3 / 65 ---
+  // --- VIP progress reflects 2 / 65 ---
   await primaryNav.getByRole("link", { name: "Rewards", exact: true }).click();
-  await expect(page.getByText("3 / 65 Coins")).toBeVisible();
+  await expect(page.getByText("2 / 65 Coins")).toBeVisible();
 
   // --- Spin & Win: spin once, and it's immediately spinnable again ---
   // The reward is a server-determined amount from a fixed prize table
@@ -75,7 +72,7 @@ test("full ATHARX demo journey: signup, reward, subscribe, spin", async ({ page 
   const spinReward = Number(spinRewardText?.match(/\d+/)?.[0]);
   expect([1, 2, 3, 5, 10]).toContain(spinReward);
   await dialog.getByRole("button", { name: "Done" }).click();
-  await expect(page.getByText(`${3 + spinReward} Coins`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`${2 + spinReward} Coins`, { exact: true })).toBeVisible();
   await expect(page.getByText("Spin Available")).toBeVisible();
   await expect(spinButton).toBeEnabled();
 });

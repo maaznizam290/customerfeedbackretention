@@ -79,22 +79,23 @@ version):
 
 1. Open ATHARX → click **Create Account**.
 2. Sign up (any full name, an Oman mobile number, an email, a password).
-3. The **Congratulations! +1 Coin** modal appears → click **OK**.
-4. The navbar now shows **🪙 1 Coin**.
-5. Go to **Prepaid Packages** → click **Subscribe** on **Gold — OMR 5**.
-6. Confirm the consumer name/mobile (prefilled) → **Subscribe Now**.
-7. **Subscription Successful** shows an `ATH-SUB-…` subscriber ID, `ACTIVE`
+3. No reward modal appears — a brand-new customer starts at **🪙 0 Coins**;
+   nothing is credited until they actually earn it.
+4. Go to **Prepaid Packages** → click **Subscribe** on **Gold — OMR 5**.
+5. Confirm the consumer name/mobile (prefilled) → **Subscribe Now**.
+6. **Subscription Successful** shows an `ATH-SUB-…` subscriber ID, `ACTIVE`
    status, and **+2 Coins**.
-8. The navbar now shows **🪙 3 Coins**; the VIP card shows **3 / 65 Coins**.
-9. Go to **Spin & Win** → spin once → **+1 Coin** → the wheel locks for 24
-   hours with a live countdown, enforced server-side.
+7. The navbar now shows **🪙 2 Coins**; the VIP card shows **2 / 65 Coins**.
+8. Go to **Spin & Win** → spin → earn 1–10 Coins depending on the wheel
+   segment, credited immediately (no cooldown in this demo build) and
+   reflected in the navbar right away.
 
 The engine-layer demo (best shown in `/control`, the ATHARX Control Panel):
 
-10. **Simulator** → pick a customer, the "Recharge OMR 5+" behaviour, and an
+9. **Simulator** → pick a customer, the "Recharge OMR 5+" behaviour, and an
     amount ≥ 5 → **SIMULATE BEHAVIOUR** → watch the event qualify, a Token
     (`OMT-26-F1-…`) get issued, and a Coin get credited, live.
-11. **Campaigns** → close the F1 Experience campaign once enough Tokens are
+10. **Campaigns** → close the F1 Experience campaign once enough Tokens are
     issued → **Selection & Results** → **Execute Selection** → a
     server-side, audited draw picks the winner(s).
 

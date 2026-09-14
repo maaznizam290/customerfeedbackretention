@@ -256,7 +256,7 @@ ordered this way.
 
 ```mermaid
 flowchart TD
-  Signup["Sign Up\n+1 Coin"] --> Subscribe["Subscribe to a\nprepaid package\n+N Coins (campaign-configured)"]
+  Signup["Sign Up\n0 Coins — nothing credited yet"] --> Subscribe["Subscribe to a\nprepaid package\n+N Coins (campaign-configured)"]
   Subscribe --> Balance["Coin Balance\n(sum of CREDITED ledger rows)"]
   Campaigns["Campaign Participation\n+Coins / +Entries"] --> Balance
   Referral["Referral Success\n+3 Coins"] --> Balance
@@ -281,7 +281,7 @@ UI component decides how many Coins anything is worth (Rule 4).
 
 | # | Rule | Where it's enforced |
 | --- | --- | --- |
-| 1 | One signup reward per customer | Partial `UNIQUE` index on `rewards(customer_id) WHERE reward_type='SIGNUP_REWARD'`; `rewardService.creditSignupReward` also checks first |
+| 1 | A new customer starts at exactly 0 Coins — nothing is credited on signup itself, only for an actual earning action afterward | `customerService.signup` no longer calls the reward ledger at all; `rewardService.creditSignupReward` (duplicate-guarded by a partial `UNIQUE` index on `rewards(customer_id) WHERE reward_type='SIGNUP_REWARD'`) remains available, unit-tested, and ready for a deployment that wants to re-enable a one-time signup bonus |
 | 2 | One subscription request creates exactly one subscription | `UNIQUE(idempotency_key)` on `subscriptions`; `subscriptionService.subscribe` returns the existing row (`is_replay: true`) on retry |
 | 3 | One normalized MSISDN maps to one subscriber identity | Partial `UNIQUE` index on `subscribers(normalized_msisdn) WHERE status='ACTIVE'`; signup rejects a taken MSISDN with `DUPLICATE_MOBILE` |
 | 4 | Campaign rewards are determined by the campaign engine | `campaignService.getSubscriptionReward` / `getRewardForType` resolve amounts from the `campaigns` table, with the package's own value only as a fallback |
@@ -417,9 +417,9 @@ contrast; verify with a contrast checker before any palette change.
   spins while idempotency still holds.
 - **E2E test** (`tests/e2e`, `npm run test:e2e`): a single Playwright
   spec drives a real Chromium browser through the mandatory demo journey —
-  signup, the +1 Coin modal, navbar update, package subscription, the +2
-  Coin success screen, navbar reaching 3 Coins, VIP progress showing 3/65,
-  and a live spin that leaves the wheel immediately spinnable again.
+  signup landing at 0 Coins with no reward modal, package subscription, the
+  +2 Coin success screen, navbar reaching 2 Coins, VIP progress showing
+  2/65, and a live spin that leaves the wheel immediately spinnable again.
 
 Manual QA also confirmed (via ad hoc browser automation during development):
 duplicate-email/duplicate-mobile signup rejection, invalid-mobile rejection,

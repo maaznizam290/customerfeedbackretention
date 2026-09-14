@@ -74,8 +74,6 @@ export const customerService = {
         normalizedMsisdn,
       });
 
-      const reward = rewardService.creditSignupReward(customerId);
-
       if (referredBy) {
         rewardService.creditReward({
           customerId: referredBy.customerId,
@@ -88,25 +86,21 @@ export const customerService = {
 
       luckyDrawService.grantEntryIfEligible(customerId, "SIGNUP");
 
-      return { customer, subscriber, reward };
+      return { customer, subscriber };
     });
 
-    const { customer, subscriber, reward } = run();
+    const { customer, subscriber } = run();
 
     analyticsService.track("signup_completed", {
       customerId: customer.customerId,
       subscriberId: subscriber.subscriberId,
       metadata: { referred: !!referredBy },
     });
-    analyticsService.track("reward_awarded", {
-      customerId: customer.customerId,
-      metadata: { rewardType: "SIGNUP_REWARD", coins: reward.coins },
-    });
 
     return {
       customer,
       subscriber,
-      coinsAwarded: reward.coins,
+      coinsAwarded: 0,
       balance: rewardService.getBalance(customer.customerId),
     };
   },

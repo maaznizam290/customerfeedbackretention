@@ -200,7 +200,7 @@ all `null`) when the MSISDN has no ATHARX profile yet.
   "success": true, "subscription_id": "SUB-OMT-000001", "subscriber_id": "ATH-SUB-000001",
   "customer_id": "CUS-OM-000001", "msisdn": "+96890000000", "package_id": "OMT-GOLD-05",
   "status": "ACTIVE", "price": 5, "currency": "OMR", "activated_at": "2026-09-13T12:00:00.000Z",
-  "reward": { "coins": 2, "status": "CREDITED" }, "coin_balance": 3,
+  "reward": { "coins": 2, "status": "CREDITED" }, "coin_balance": 2,
   "vip_just_reached": false, "is_replay": false
 }
 ```
@@ -208,8 +208,10 @@ all `null`) when the MSISDN has no ATHARX profile yet.
 The customer/subscriber identity is resolved **purely from the MSISDN**
 (matching this schema's lack of a `customer_id` field): a number with an
 existing active ATHARX subscriber reuses it; a brand-new number gets a
-freshly provisioned customer + subscriber (no signup reward is granted in
-that case — the signup reward is tied specifically to `/customers/signup`).
+freshly provisioned customer + subscriber. Signup itself never credits any
+Coins in this build (see `/customers/signup` below) — the `+2` here is only
+the Gold package's subscription reward, so `coin_balance` reaches exactly 2
+for a brand-new customer.
 
 Errors: `404 PACKAGE_UNAVAILABLE`, `502 SUBSCRIPTION_FAILED` (mock adapter
 failure — no reward is granted).
@@ -235,20 +237,27 @@ failure — no reward is granted).
 ```json
 {
   "success": true, "customer_id": "CUS-OM-000001", "subscriber_id": "ATH-SUB-000001",
-  "full_name": "Ahmed", "referral_code": "AHME0001", "coins_awarded": 1, "coin_balance": 1
+  "full_name": "Ahmed", "referral_code": "AHME0001", "coins_awarded": 0, "coin_balance": 0
 }
 ```
 
+Signup itself credits no Coins — a brand-new customer starts at exactly 0
+until they earn a Coin through an actual action (a package subscription, a
+spin, a campaign, etc). `coins_awarded`/`coin_balance` are always `0` here
+unless a referral code was supplied and is valid (see below) — a referral
+never credits the *new* signee, only the *referrer*, so this response stays
+`0` either way.
+
 Errors: `400 VALIDATION_ERROR` / `400 INVALID_MOBILE`, `409 DUPLICATE_EMAIL`,
 `409 DUPLICATE_MOBILE`. A referral code that resolves to an existing customer
-credits that customer +3 Coins (`REFERRAL_SUCCESS`).
+credits that customer (the referrer) +3 Coins (`REFERRAL_SUCCESS`).
 
 ## Rewards
 
 ### GET /rewards/balance/{customer_id}
 
 ```json
-{ "customer_id": "CUS-OM-000001", "coin_balance": 3 }
+{ "customer_id": "CUS-OM-000001", "coin_balance": 5 }
 ```
 
 ### GET /rewards/ledger/{customer_id}
@@ -256,8 +265,8 @@ credits that customer +3 Coins (`REFERRAL_SUCCESS`).
 ```json
 {
   "items": [
-    { "reward_id": "RWD-000002", "type": "PACKAGE_SUBSCRIPTION_REWARD", "coins": 2, "status": "CREDITED", "description": "Gold Subscription Reward", "created_at": "…" },
-    { "reward_id": "RWD-000001", "type": "SIGNUP_REWARD", "coins": 1, "status": "CREDITED", "description": "ATHARX Signup Reward", "created_at": "…" }
+    { "reward_id": "RWD-000002", "type": "SPIN_REWARD", "coins": 3, "status": "CREDITED", "description": "ATHARX Daily Spin Reward", "created_at": "…" },
+    { "reward_id": "RWD-000001", "type": "PACKAGE_SUBSCRIPTION_REWARD", "coins": 2, "status": "CREDITED", "description": "Gold Subscription Reward", "created_at": "…" }
   ]
 }
 ```

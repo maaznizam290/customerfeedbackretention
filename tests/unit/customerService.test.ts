@@ -4,7 +4,7 @@ import { InvalidMsisdnError } from "@/lib/msisdn";
 import { rewardService } from "@/services/rewardService";
 
 describe("customerService.signup", () => {
-  it("creates a customer + subscriber hierarchy and credits exactly 1 Coin (Acceptance 1-2)", () => {
+  it("creates a customer + subscriber hierarchy with a 0-Coin starting balance", () => {
     const result = customerService.signup({
       fullName: "Ahmed",
       mobile: "+96890000001",
@@ -15,9 +15,9 @@ describe("customerService.signup", () => {
     expect(result.customer.customerId).toMatch(/^CUS-OM-\d{6}$/);
     expect(result.subscriber.subscriberId).toMatch(/^ATH-SUB-\d{6}$/);
     expect(result.subscriber.customerId).toBe(result.customer.customerId);
-    expect(result.coinsAwarded).toBe(1);
-    expect(result.balance).toBe(1);
-    expect(rewardService.getBalance(result.customer.customerId)).toBe(1);
+    expect(result.coinsAwarded).toBe(0);
+    expect(result.balance).toBe(0);
+    expect(rewardService.getBalance(result.customer.customerId)).toBe(0);
   });
 
   it("rejects a duplicate email", () => {

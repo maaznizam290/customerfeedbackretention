@@ -80,7 +80,7 @@ describe("ATHARX API — signup + subscription + reward golden path", () => {
   const email = `api.test.${Date.now()}@example.com`;
   let customerId: string;
 
-  it("signup credits exactly 1 Coin", async () => {
+  it("signup starts the customer at 0 Coins — nothing is credited until they earn it", async () => {
     const { status, json } = await post("/customers/signup", {
       fullName: "Ahmed",
       mobile,
@@ -89,8 +89,8 @@ describe("ATHARX API — signup + subscription + reward golden path", () => {
       confirmPassword: "Demo@123",
     });
     expect(status).toBe(201);
-    expect(json.coins_awarded).toBe(1);
-    expect(json.coin_balance).toBe(1);
+    expect(json.coins_awarded).toBe(0);
+    expect(json.coin_balance).toBe(0);
     customerId = json.customer_id;
   });
 
@@ -119,7 +119,7 @@ describe("ATHARX API — signup + subscription + reward golden path", () => {
     expect(status).toBe(201);
     expect(json.status).toBe("ACTIVE");
     expect(json.reward.coins).toBe(2);
-    expect(json.coin_balance).toBe(3);
+    expect(json.coin_balance).toBe(2);
     expect(json.subscriber_id).toMatch(/^ATH-SUB-\d{6}$/);
   });
 
@@ -132,16 +132,15 @@ describe("ATHARX API — signup + subscription + reward golden path", () => {
     });
     expect(status).toBe(201);
     expect(json.is_replay).toBe(true);
-    expect(json.coin_balance).toBe(3);
+    expect(json.coin_balance).toBe(2);
   });
 
-  it("the reward ledger records both the signup and subscription rewards", async () => {
+  it("the reward ledger records the subscription reward", async () => {
     const { status, json } = await get(`/rewards/ledger/${customerId}`, {
       Authorization: "Bearer mock_access_token",
     });
     expect(status).toBe(200);
     const types = json.items.map((i: { type: string }) => i.type);
-    expect(types).toContain("SIGNUP_REWARD");
     expect(types).toContain("PACKAGE_SUBSCRIPTION_REWARD");
   });
 
@@ -251,8 +250,15 @@ describe("ATHARX API — Vault redemption over HTTP", () => {
       confirmPassword: "Demo@123",
     });
     customerId = signup.json.customer_id;
-    // Signup (+1) + Gold (+2) + Platinum (+5) = 8 Coins, exactly enough for
-    // the cheapest seeded Vault offer (VAULT-000001, 8 Coins).
+    // Silver (+1) + Gold (+2) + Platinum (+5) = 8 Coins, exactly enough for
+    // the cheapest seeded Vault offer (VAULT-000001, 8 Coins). Signup itself
+    // credits 0 Coins in this build — see the signup test above.
+    await post("/subscriptions/subscribe", {
+      customer_name: "Vault Tester",
+      msisdn: "+96895598765",
+      package_id: "OMT-SILVER-03",
+      idempotency_key: `VAULT-REQ-SILVER-${Date.now()}`,
+    });
     await post("/subscriptions/subscribe", {
       customer_name: "Vault Tester",
       msisdn: "+96895598765",

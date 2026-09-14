@@ -30,7 +30,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
         onSuccess={async ({ coinsAwarded, balance }) => {
           setSignupOpen(false);
           await refresh();
-          setReward({ coins: coinsAwarded, balance });
+          if (coinsAwarded > 0) setReward({ coins: coinsAwarded, balance });
         }}
       />
 
