@@ -87,8 +87,8 @@ export default function VaultPage() {
         <p className="text-xs font-black uppercase tracking-widest text-emerald-200">ATHARX Vault</p>
         <h1 className="mt-2 text-3xl font-black sm:text-4xl">Unlock Oman, One Coin at a Time</h1>
         <p className="mx-auto mt-2 max-w-lg text-sm text-white/70">
-          Spend the Coins you&apos;ve earned to unlock 20–30% off restaurants, hotels, parks, and premium experiences
-          across Oman.
+          Spend the Coins you&apos;ve earned to unlock 20–50% off restaurants, hotels, parks, and premium experiences
+          across Oman. Tap any card to see what it takes to unlock it.
         </p>
         {!sessionLoading && !session.authenticated ? (
           <button
@@ -148,12 +148,37 @@ export default function VaultPage() {
   );
 }
 
-const CATEGORY_ICON_BG: Record<ApiVaultOffer["category"], string> = {
-  RESTAURANT: "from-amber-500 to-amber-600",
-  HOTEL: "from-atharx-navy to-atharx-navy2",
-  PARK: "from-emerald-600 to-atharx-teal",
-  EXPERIENCE: "from-atharx-navy to-fuchsia-700",
-};
+const SKIP_WORDS = new Set(["the", "a", "an", "al", "of", "at", "by", "&"]);
+
+function monogramFor(name: string): string {
+  const words = name
+    .replace(/[,–—-]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((w) => !SKIP_WORDS.has(w.toLowerCase()));
+  const letters = words
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+  return letters || name.slice(0, 2).toUpperCase();
+}
+
+const BADGE_COLORS = [
+  "bg-fuchsia-500",
+  "bg-amber-500",
+  "bg-emerald-500",
+  "bg-sky-500",
+  "bg-rose-500",
+  "bg-indigo-500",
+  "bg-teal-500",
+  "bg-orange-500",
+];
+
+function badgeColorFor(offerId: string): string {
+  let hash = 0;
+  for (let i = 0; i < offerId.length; i++) hash = (hash * 31 + offerId.charCodeAt(i)) >>> 0;
+  return BADGE_COLORS[hash % BADGE_COLORS.length];
+}
 
 function VaultCard({
   offer,
@@ -170,56 +195,90 @@ function VaultCard({
   authenticated: boolean;
   onRedeem: () => void;
 }) {
+  const [flipped, setFlipped] = useState(false);
   const unlocked = !!redemption;
   const canAfford = balance >= offer.coin_cost;
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-3xl border border-atharx-navy/10 bg-white shadow-card transition hover:-translate-y-1 hover:shadow-xl">
-      <div className={`relative bg-gradient-to-br ${CATEGORY_ICON_BG[offer.category]} px-6 py-6 text-white`}>
-        <span className="absolute right-4 top-4 rounded-full bg-white px-3 py-1 text-xs font-black text-atharx-navy shadow">
-          {offer.discount_percent}% OFF
-        </span>
-        <span className="text-4xl">{offer.icon}</span>
-        <h3 className="mt-3 text-lg font-black leading-tight">{offer.partner_name}</h3>
-        <p className="text-xs font-semibold text-white/70">{offer.city}</p>
-      </div>
+    <div className="[perspective:1200px]">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setFlipped((v) => !v)}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setFlipped((v) => !v)}
+        className="relative h-72 w-full cursor-pointer transition-transform duration-500 [transform-style:preserve-3d]"
+        style={{ transform: flipped ? "rotateY(180deg)" : "none" }}
+        aria-label={`${offer.partner_name}, ${offer.discount_percent}% off. Tap for unlock details.`}
+      >
+        {/* Front */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-gradient-to-br from-[#3a1f5e] via-[#3d2166] to-[#241040] p-6 text-center shadow-card [backface-visibility:hidden]">
+          <span
+            className={`flex h-16 w-16 items-center justify-center rounded-full text-lg font-black text-white shadow-lg ring-4 ring-white/10 ${badgeColorFor(offer.offer_id)}`}
+          >
+            {monogramFor(offer.partner_name)}
+          </span>
+          <h3 className="mt-4 text-base font-black leading-tight text-white">{offer.partner_name}</h3>
+          <p className="mt-0.5 text-xs font-semibold text-white/50">{offer.city}</p>
+          <p className="mt-3 text-lg font-black text-emerald-400">{offer.discount_percent}% Off</p>
+          {unlocked && (
+            <span className="mt-3 rounded-full bg-emerald-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-emerald-400/30">
+              Unlocked ✓
+            </span>
+          )}
+          <p className="mt-4 text-[10px] font-semibold uppercase tracking-widest text-white/30">Tap for details</p>
+        </div>
 
-      <div className="flex flex-1 flex-col p-6">
-        <p className="text-sm text-atharx-navy/60">{offer.description}</p>
+        {/* Back */}
+        <div
+          className="absolute inset-0 flex flex-col rounded-3xl bg-gradient-to-br from-[#241040] via-[#3d2166] to-[#3a1f5e] p-5 text-white shadow-card [backface-visibility:hidden]"
+          style={{ transform: "rotateY(180deg)" }}
+        >
+          <h3 className="text-sm font-black leading-tight">{offer.partner_name}</h3>
+          <p className="mt-2 line-clamp-2 text-xs text-white/60">{offer.description}</p>
 
-        {unlocked ? (
-          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-center ring-1 ring-emerald-200">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Unlocked — Your Voucher</p>
-            <p className="mt-1 font-mono text-sm font-black text-emerald-800">{redemption.voucher_code}</p>
-          </div>
-        ) : (
-          <>
-            <div className="mt-4 flex items-center justify-between rounded-2xl bg-atharx-cloud px-4 py-2.5 text-sm font-bold text-atharx-navy">
-              <span>Unlock for</span>
-              <span>🪙 {offer.coin_cost} Coins</span>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-white/10 px-3 py-2 text-center">
+              <p className="text-lg font-black">{offer.coin_cost}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-white/50">Min. Coins</p>
             </div>
-            <button
-              type="button"
-              onClick={onRedeem}
-              disabled={redeeming || (authenticated && !canAfford)}
-              className="mt-4 rounded-full bg-atharx-navy py-3 text-sm font-bold text-white shadow-card transition hover:bg-atharx-navy2 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {redeeming
-                ? "Unlocking..."
-                : !authenticated
-                  ? "Sign Up to Unlock"
-                  : canAfford
-                    ? "Unlock Offer"
-                    : `Need ${offer.coin_cost - balance} more Coins`}
-            </button>
-          </>
-        )}
+            <div className="rounded-xl bg-white/10 px-3 py-2 text-center">
+              <p className="text-lg font-black text-emerald-400">{offer.discount_percent}%</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-white/50">Discount</p>
+            </div>
+          </div>
 
-        {offer.demo_partner && (
-          <p className="mt-2 text-center text-[10px] font-semibold uppercase tracking-wide text-atharx-navy/30">
-            Demo Partner — sandbox data
-          </p>
-        )}
+          <div className="mt-auto">
+            {unlocked ? (
+              <div className="rounded-xl bg-emerald-500/15 px-3 py-2.5 text-center ring-1 ring-emerald-400/30">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-300">Your Voucher</p>
+                <p className="mt-0.5 font-mono text-xs font-black text-emerald-200">{redemption.voucher_code}</p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRedeem();
+                }}
+                disabled={redeeming || (authenticated && !canAfford)}
+                className="w-full rounded-full bg-white py-2.5 text-xs font-bold text-atharx-navy shadow-card transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {redeeming
+                  ? "Unlocking..."
+                  : !authenticated
+                    ? "Sign Up to Unlock"
+                    : canAfford
+                      ? `Unlock for ${offer.coin_cost} Coins`
+                      : `Need ${offer.coin_cost - balance} more Coins`}
+              </button>
+            )}
+            {offer.demo_partner && (
+              <p className="mt-2 text-center text-[9px] font-semibold uppercase tracking-wide text-white/25">
+                Demo Partner — sandbox data
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

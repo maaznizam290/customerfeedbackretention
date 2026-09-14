@@ -236,13 +236,19 @@ describe("ATHARX API — Vault redemption over HTTP", () => {
       confirmPassword: "Demo@123",
     });
     customerId = signup.json.customer_id;
-    // Signup (+1) + Platinum subscription (+5) = 6 Coins, enough for the
-    // cheapest seeded Vault offer (VAULT-000001, 5 Coins).
+    // Signup (+1) + Gold (+2) + Platinum (+5) = 8 Coins, exactly enough for
+    // the cheapest seeded Vault offer (VAULT-000001, 8 Coins).
+    await post("/subscriptions/subscribe", {
+      customer_name: "Vault Tester",
+      msisdn: "+96895598765",
+      package_id: "OMT-GOLD-05",
+      idempotency_key: `VAULT-REQ-GOLD-${Date.now()}`,
+    });
     await post("/subscriptions/subscribe", {
       customer_name: "Vault Tester",
       msisdn: "+96895598765",
       package_id: "OMT-PLATINUM-10",
-      idempotency_key: `VAULT-REQ-${Date.now()}`,
+      idempotency_key: `VAULT-REQ-PLAT-${Date.now()}`,
     });
   });
 
@@ -261,8 +267,8 @@ describe("ATHARX API — Vault redemption over HTTP", () => {
     );
     expect(status).toBe(201);
     expect(json.already_redeemed).toBe(false);
-    expect(json.coins_spent).toBe(5);
-    expect(json.coin_balance).toBe(1);
+    expect(json.coins_spent).toBe(8);
+    expect(json.coin_balance).toBe(0);
     expect(json.voucher_code).toMatch(/^ATHARX-VRD-/);
   });
 
@@ -274,12 +280,12 @@ describe("ATHARX API — Vault redemption over HTTP", () => {
     );
     expect(status).toBe(200);
     expect(json.already_redeemed).toBe(true);
-    expect(json.coin_balance).toBe(1);
+    expect(json.coin_balance).toBe(0);
   });
 
   it("rejects an offer the customer can't afford with 403 INSUFFICIENT_COINS", async () => {
     const { status, json } = await post(
-      "/vault/VAULT-000010/redeem",
+      "/vault/VAULT-000003/redeem",
       { customer_id: customerId },
       { Authorization: "Bearer mock_access_token" }
     );

@@ -349,10 +349,10 @@ credits the ledger.
 {
   "offers": [
     {
-      "offer_id": "VAULT-000001", "partner_name": "Muscat Bay Grill", "category": "RESTAURANT",
-      "city": "Muscat, Oman", "icon": "🍽️", "discount_percent": 20,
-      "description": "Waterfront grill house specializing in fresh Omani seafood and charcoal-grilled classics.",
-      "coin_cost": 5, "demo_partner": true, "status": "ACTIVE"
+      "offer_id": "VAULT-000001", "partner_name": "Bait Al Luban Omani Restaurant – Mutrah", "category": "RESTAURANT",
+      "city": "Mutrah, Muscat", "icon": "🍽️", "discount_percent": 25,
+      "description": "Landmark Omani dining on the Mutrah Corniche, known for traditional Omani thali platters.",
+      "coin_cost": 8, "demo_partner": true, "status": "ACTIVE"
     }
   ]
 }
@@ -374,7 +374,7 @@ sponsorship or endorsement by any named brand.
 {
   "success": true, "already_redeemed": false, "redemption_id": "VRD-000001",
   "offer_id": "VAULT-000001", "voucher_code": "ATHARX-VRD-000001",
-  "coins_spent": 5, "coin_balance": 60
+  "coins_spent": 8, "coin_balance": 60
 }
 
 // Response 200 — repeat call for an already-unlocked offer (idempotent, no second charge)
