@@ -415,6 +415,149 @@ const seedTx = db.transaction(() => {
     });
   }
 
+  // ---- ATHARX Vault: Oman restaurants, hotels/resorts, parks, and premium
+  // experiences, unlocked by spending Coins (see ASSESSMENT.md-style note in
+  // vaultService.ts — this is the first place Coins are ever spent, not
+  // just earned). All demo/sandbox partners, never real commercial deals.
+  const vaultOffers: {
+    offerId: string;
+    partnerName: string;
+    category: "RESTAURANT" | "HOTEL" | "PARK" | "EXPERIENCE";
+    city: string;
+    icon: string;
+    discountPercent: number;
+    coinCost: number;
+    description: string;
+  }[] = [
+    {
+      offerId: "VAULT-000001",
+      partnerName: "Muscat Bay Grill",
+      category: "RESTAURANT",
+      city: "Muscat, Oman",
+      icon: "🍽️",
+      discountPercent: 20,
+      coinCost: 5,
+      description: "Waterfront grill house specializing in fresh Omani seafood and charcoal-grilled classics.",
+    },
+    {
+      offerId: "VAULT-000002",
+      partnerName: "Al Bustan Spice Kitchen",
+      category: "RESTAURANT",
+      city: "Muscat, Oman",
+      icon: "🍛",
+      discountPercent: 25,
+      coinCost: 6,
+      description: "Traditional Omani spice-route cuisine in a modern setting.",
+    },
+    {
+      offerId: "VAULT-000003",
+      partnerName: "Sohar Seafood House",
+      category: "RESTAURANT",
+      city: "Sohar, Oman",
+      icon: "🦞",
+      discountPercent: 20,
+      coinCost: 5,
+      description: "Daily catch seafood dining on Oman's northern coast.",
+    },
+    {
+      offerId: "VAULT-000004",
+      partnerName: "Muscat Pearl Resort & Spa",
+      category: "HOTEL",
+      city: "Muscat, Oman",
+      icon: "🏨",
+      discountPercent: 25,
+      coinCost: 12,
+      description: "Beachfront resort stays with a full-service spa, steps from the Gulf of Oman.",
+    },
+    {
+      offerId: "VAULT-000005",
+      partnerName: "Jebel Shams Mountain Retreat",
+      category: "HOTEL",
+      city: "Jebel Shams, Oman",
+      icon: "🏔️",
+      discountPercent: 30,
+      coinCost: 15,
+      description: "Clifftop rooms overlooking Oman's Grand Canyon.",
+    },
+    {
+      offerId: "VAULT-000006",
+      partnerName: "Salalah Khareef Resort",
+      category: "HOTEL",
+      city: "Salalah, Oman",
+      icon: "🌴",
+      discountPercent: 25,
+      coinCost: 12,
+      description: "Lush monsoon-season resort stays in the south of Oman.",
+    },
+    {
+      offerId: "VAULT-000007",
+      partnerName: "Wadi Adventure Park",
+      category: "PARK",
+      city: "Muscat, Oman",
+      icon: "🏞️",
+      discountPercent: 20,
+      coinCost: 6,
+      description: "Zip-lining, kayaking, and canyon trails for a full family day out.",
+    },
+    {
+      offerId: "VAULT-000008",
+      partnerName: "Nizwa Heritage Fort Experience",
+      category: "PARK",
+      city: "Nizwa, Oman",
+      icon: "🏰",
+      discountPercent: 20,
+      coinCost: 6,
+      description: "Guided tours through Oman's historic fort and souq district.",
+    },
+    {
+      offerId: "VAULT-000009",
+      partnerName: "Musandam Dolphin Cruise Park",
+      category: "PARK",
+      city: "Musandam, Oman",
+      icon: "🐬",
+      discountPercent: 25,
+      coinCost: 8,
+      description: "Dhow cruises and dolphin-watching along the Musandam fjords.",
+    },
+    {
+      offerId: "VAULT-000010",
+      partnerName: "F1 & Motorsport Experience Day",
+      category: "EXPERIENCE",
+      city: "Regional (GCC)",
+      icon: "🏎️",
+      discountPercent: 30,
+      coinCost: 25,
+      description:
+        "A high-octane motorsport day, inspired by Ferrari World-style experiences. Demo concept — not a confirmed commercial partnership.",
+    },
+    {
+      offerId: "VAULT-000011",
+      partnerName: "Desert Safari & Overnight Camp",
+      category: "EXPERIENCE",
+      city: "Wahiba Sands, Oman",
+      icon: "🏜️",
+      discountPercent: 25,
+      coinCost: 18,
+      description: "Dune bashing, a traditional Bedouin camp, and a night under the stars.",
+    },
+    {
+      offerId: "VAULT-000012",
+      partnerName: "Private Yacht Sunset Cruise",
+      category: "EXPERIENCE",
+      city: "Muscat, Oman",
+      icon: "⛵",
+      discountPercent: 30,
+      coinCost: 20,
+      description: "A private sunset cruise along the Muscat coastline.",
+    },
+  ];
+  for (const v of vaultOffers) {
+    db.prepare(
+      `INSERT INTO vault_offers (offer_id, enterprise_id, partner_name, category, city, icon, discount_percent, description, coin_cost, demo_partner, status, created_at, updated_at)
+       VALUES (@offerId, 'OMT', @partnerName, @category, @city, @icon, @discountPercent, @description, @coinCost, 1, 'ACTIVE', @now, @now)`
+    ).run({ ...v, now: now() });
+  }
+
   // ---- Lucky Draw ----
   db.prepare(
     `INSERT INTO lucky_draws (lucky_draw_id, campaign_id, name, minimum_coins, entry_requirement, start_date, end_date, draw_date, winner_count, status, created_at, updated_at)

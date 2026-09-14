@@ -2,6 +2,37 @@
 // components. Kept separate from the domain types in src/types/index.ts,
 // which describe internal server-side models.
 
+export interface ApiVaultOffer {
+  offer_id: string;
+  partner_name: string;
+  category: "RESTAURANT" | "HOTEL" | "PARK" | "EXPERIENCE";
+  city: string;
+  icon: string;
+  discount_percent: number;
+  description: string;
+  coin_cost: number;
+  demo_partner: boolean;
+  status: string;
+}
+
+export interface ApiVaultRedemption {
+  redemption_id: string;
+  offer_id: string;
+  coins_spent: number;
+  voucher_code: string;
+  redeemed_at: string;
+}
+
+export interface ApiVaultRedeemResult {
+  success: boolean;
+  already_redeemed: boolean;
+  redemption_id: string;
+  offer_id: string;
+  voucher_code: string;
+  coins_spent: number;
+  coin_balance: number;
+}
+
 export interface ApiPackage {
   package_id: string;
   name: string;

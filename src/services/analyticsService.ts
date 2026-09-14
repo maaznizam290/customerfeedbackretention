@@ -26,7 +26,9 @@ export type AnalyticsEventName =
   | "spin_completed"
   | "spin_reward_credited"
   | "spin_ineligible"
-  | "spin_failed";
+  | "spin_failed"
+  | "vault_viewed"
+  | "vault_offer_redeemed";
 
 export const analyticsService = {
   track(

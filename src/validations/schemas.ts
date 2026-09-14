@@ -48,3 +48,7 @@ export const spinExecuteSchema = z.object({
 export const luckyDrawEntrySchema = z.object({
   customer_id: z.string().min(1),
 });
+
+export const vaultRedeemSchema = z.object({
+  customer_id: z.string().min(1),
+});

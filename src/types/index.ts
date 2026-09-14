@@ -131,6 +131,36 @@ export interface SelectionResult {
   selectedAt: string;
 }
 
+export type VaultOfferCategory = "RESTAURANT" | "HOTEL" | "PARK" | "EXPERIENCE";
+
+export interface VaultOffer {
+  id: number;
+  offerId: string; // VAULT-000001
+  enterpriseId: string;
+  partnerName: string;
+  category: VaultOfferCategory;
+  city: string;
+  icon: string;
+  discountPercent: number;
+  description: string;
+  coinCost: number;
+  demoPartner: boolean;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VaultRedemption {
+  id: number;
+  redemptionId: string; // VRD-000001
+  offerId: string;
+  customerId: string;
+  rewardId: string;
+  coinsSpent: number;
+  voucherCode: string;
+  redeemedAt: string;
+}
+
 export interface Subscriber {
   id: number;
   subscriberId: string; // ATH-SUB-000001
@@ -185,7 +215,8 @@ export type RewardType =
   | "RECHARGE_THRESHOLD"
   | "PARTNER_PURCHASE"
   | "SPIN_REWARD"
-  | "CAMPAIGN_REWARD";
+  | "CAMPAIGN_REWARD"
+  | "VAULT_REDEMPTION";
 
 export interface Reward {
   id: number;

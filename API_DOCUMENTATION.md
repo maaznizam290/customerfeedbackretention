@@ -60,6 +60,9 @@ client_secret: atharx-demo-secret
 | GET | `/campaigns` | Public | Active ATHARX campaigns (includes Featured Experience fields) |
 | POST | `/events/qualifying` | Public | Generic qualifying-behaviour ingestion (validate → token → Coin) |
 | GET | `/prizes` | Public | Lucky Draw prize catalog |
+| GET | `/vault` | Public | ATHARX Vault catalog (Oman restaurants/hotels/parks/experiences) |
+| GET | `/vault/redemptions/{customer_id}` | Bearer or session | Customer's unlocked Vault offers |
+| POST | `/vault/{offer_id}/redeem` | Bearer or session | Unlock a Vault offer (spends Coins, idempotent) |
 | GET | `/lucky-draws/active` | Public | Active lucky draws |
 | GET | `/lucky-draws/{id}/winners` | Public | Winners for a draw (server-selected) |
 | GET | `/subscribers/{msisdn}` | Public | Subscriber/customer identity lookup by MSISDN |
@@ -332,6 +335,65 @@ for auditability — the frontend never computes winners.
 Apple is not a sponsor of this campaign; prizes are campaign rewards, not
 Apple-sponsored promotions.
 
+## ATHARX Vault
+
+A standing catalog of Oman lifestyle partners — restaurants, hotels/resorts,
+parks/attractions, and premium experiences — each offering a fixed 20–30%
+discount, unlocked by spending Coins. This is the first place in ATHARX
+Coins are ever spent rather than earned; every other reward path only ever
+credits the ledger.
+
+### GET /vault
+
+```json
+{
+  "offers": [
+    {
+      "offer_id": "VAULT-000001", "partner_name": "Muscat Bay Grill", "category": "RESTAURANT",
+      "city": "Muscat, Oman", "icon": "🍽️", "discount_percent": 20,
+      "description": "Waterfront grill house specializing in fresh Omani seafood and charcoal-grilled classics.",
+      "coin_cost": 5, "demo_partner": true, "status": "ACTIVE"
+    }
+  ]
+}
+```
+
+`category` is one of `RESTAURANT`, `HOTEL`, `PARK`, `EXPERIENCE`. Every offer
+is `demo_partner: true` — a sandbox catalog for this prototype, not a live
+commercial agreement. The `EXPERIENCE` category includes a motorsport-themed
+listing inspired by Ferrari World-style experiences; this does not imply
+sponsorship or endorsement by any named brand.
+
+### POST /vault/{offer_id}/redeem
+
+```json
+// Request
+{ "customer_id": "CUS-OM-000001" }
+
+// Response 201 — first unlock
+{
+  "success": true, "already_redeemed": false, "redemption_id": "VRD-000001",
+  "offer_id": "VAULT-000001", "voucher_code": "ATHARX-VRD-000001",
+  "coins_spent": 5, "coin_balance": 60
+}
+
+// Response 200 — repeat call for an already-unlocked offer (idempotent, no second charge)
+{ "success": true, "already_redeemed": true, "redemption_id": "VRD-000001", "...": "..." }
+```
+
+The balance check and the Coin debit happen inside one transaction, so a
+customer can never be charged more than they have, and each offer can only
+ever be unlocked once per customer (enforced by a database constraint as
+the concurrency backstop, not just an application-level check). Insufficient
+balance returns `403 INSUFFICIENT_COINS` with `required_coins` and `balance`
+in the response body.
+
+### GET /vault/redemptions/{customer_id}
+
+```json
+{ "redemptions": [{ "redemption_id": "VRD-000001", "offer_id": "VAULT-000001", "coins_spent": 5, "voucher_code": "ATHARX-VRD-000001", "redeemed_at": "…" }] }
+```
+
 ## Spin & Win
 
 ### GET /spin/eligibility/{customer_id}
@@ -478,7 +540,7 @@ creating a duplicate or granting a second reward. This is enforced by:
 | 400 | `VALIDATION_ERROR`, `INVALID_MOBILE` |
 | 401 | `UNAUTHORIZED`, `INVALID_CLIENT` |
 | 403 | `INSUFFICIENT_COINS` |
-| 404 | `PACKAGE_UNAVAILABLE`, `MILESTONE_NOT_FOUND`, `LUCKY_DRAW_NOT_FOUND` |
+| 404 | `PACKAGE_UNAVAILABLE`, `MILESTONE_NOT_FOUND`, `LUCKY_DRAW_NOT_FOUND`, `VAULT_OFFER_NOT_FOUND` |
 | 409 | `DUPLICATE_EMAIL`, `DUPLICATE_MOBILE`, `DUPLICATE_SIGNUP_REWARD`, `COOLDOWN_ACTIVE`, `ALREADY_ENTERED`, `INVALID_TRANSITION`, `CAMPAIGN_NOT_CLOSABLE` |
 | 502 | `SUBSCRIPTION_FAILED` (mock Omantel adapter failure) |
 | 503 | `NO_ACTIVE_CAMPAIGN` |

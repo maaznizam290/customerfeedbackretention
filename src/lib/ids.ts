@@ -78,3 +78,11 @@ export function generateSelectionResultId(): string {
 export function generateSimulationId(): string {
   return `SIM-${pad(nextSequence("simulation"), 6)}`;
 }
+
+export function generateVaultOfferId(): string {
+  return `VAULT-${pad(nextSequence("vault_offer"), 6)}`;
+}
+
+export function generateVaultRedemptionId(): string {
+  return `VRD-${pad(nextSequence("vault_redemption"), 6)}`;
+}

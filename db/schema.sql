@@ -381,6 +381,49 @@ CREATE TABLE IF NOT EXISTS spin_transactions (
 CREATE INDEX IF NOT EXISTS idx_spin_transactions_customer
   ON spin_transactions(customer_id, spin_campaign_id, next_spin_available_at DESC);
 
+-- ATHARX Vault: a catalog of Oman lifestyle partners (restaurants, hotels/
+-- resorts, parks/attractions, and premium experiences) offering a fixed
+-- discount, unlocked by spending Coins. This is a separate concept from
+-- Tokens/Campaigns: a Vault offer is a standing catalog entry, not tied to
+-- any one behaviour or campaign, and "redeeming" it spends Coins (the first
+-- place in ATHARX Coins are ever spent, not just earned) rather than
+-- issuing a Token.
+CREATE TABLE IF NOT EXISTS vault_offers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  offer_id TEXT NOT NULL UNIQUE,
+  enterprise_id TEXT NOT NULL DEFAULT 'OMT' REFERENCES enterprises(enterprise_id),
+  partner_name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  city TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT '🎁',
+  discount_percent INTEGER NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  coin_cost INTEGER NOT NULL,
+  demo_partner BOOLEAN NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_vault_offers_status ON vault_offers(status);
+
+-- One redemption per (offer, customer): unlocking an offer is a one-time
+-- Coin spend that reveals a durable voucher code, not a repeatable action.
+CREATE TABLE IF NOT EXISTS vault_redemptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  redemption_id TEXT NOT NULL UNIQUE,
+  offer_id TEXT NOT NULL REFERENCES vault_offers(offer_id),
+  customer_id TEXT NOT NULL REFERENCES customers(customer_id),
+  reward_id TEXT NOT NULL REFERENCES rewards(reward_id),
+  coins_spent INTEGER NOT NULL,
+  voucher_code TEXT NOT NULL,
+  redeemed_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_redemptions_one_per_customer
+  ON vault_redemptions(offer_id, customer_id);
+CREATE INDEX IF NOT EXISTS idx_vault_redemptions_customer ON vault_redemptions(customer_id);
+
 CREATE TABLE IF NOT EXISTS analytics_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_id TEXT NOT NULL UNIQUE,

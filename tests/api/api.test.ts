@@ -223,3 +223,67 @@ describe("ATHARX API — spin cooldown over HTTP", () => {
     expect(status).toBe(409);
   });
 });
+
+describe("ATHARX API — Vault redemption over HTTP", () => {
+  let customerId: string;
+
+  beforeAll(async () => {
+    const signup = await post("/customers/signup", {
+      fullName: "Vault Tester",
+      mobile: "+96895598765",
+      email: `vault.api.test.${Date.now()}@example.com`,
+      password: "Demo@123",
+      confirmPassword: "Demo@123",
+    });
+    customerId = signup.json.customer_id;
+    // Signup (+1) + Platinum subscription (+5) = 6 Coins, enough for the
+    // cheapest seeded Vault offer (VAULT-000001, 5 Coins).
+    await post("/subscriptions/subscribe", {
+      customer_name: "Vault Tester",
+      msisdn: "+96895598765",
+      package_id: "OMT-PLATINUM-10",
+      idempotency_key: `VAULT-REQ-${Date.now()}`,
+    });
+  });
+
+  it("lists the seeded Vault catalog publicly, with no auth required", async () => {
+    const { status, json } = await get("/vault");
+    expect(status).toBe(200);
+    expect(json.offers.length).toBeGreaterThan(0);
+    expect(json.offers.some((o: { offer_id: string }) => o.offer_id === "VAULT-000001")).toBe(true);
+  });
+
+  it("unlocks an offer, debiting exactly its Coin cost and returning a voucher code", async () => {
+    const { status, json } = await post(
+      "/vault/VAULT-000001/redeem",
+      { customer_id: customerId },
+      { Authorization: "Bearer mock_access_token" }
+    );
+    expect(status).toBe(201);
+    expect(json.already_redeemed).toBe(false);
+    expect(json.coins_spent).toBe(5);
+    expect(json.coin_balance).toBe(1);
+    expect(json.voucher_code).toMatch(/^ATHARX-VRD-/);
+  });
+
+  it("is idempotent on retry — returns the same voucher at 200, without a second charge", async () => {
+    const { status, json } = await post(
+      "/vault/VAULT-000001/redeem",
+      { customer_id: customerId },
+      { Authorization: "Bearer mock_access_token" }
+    );
+    expect(status).toBe(200);
+    expect(json.already_redeemed).toBe(true);
+    expect(json.coin_balance).toBe(1);
+  });
+
+  it("rejects an offer the customer can't afford with 403 INSUFFICIENT_COINS", async () => {
+    const { status, json } = await post(
+      "/vault/VAULT-000010/redeem",
+      { customer_id: customerId },
+      { Authorization: "Bearer mock_access_token" }
+    );
+    expect(status).toBe(403);
+    expect(json.error.code).toBe("INSUFFICIENT_COINS");
+  });
+});

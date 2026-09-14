@@ -6,6 +6,7 @@ import { milestoneRepository } from "@/repositories/milestoneRepository";
 import { spinRepository } from "@/repositories/spinRepository";
 import { luckyDrawRepository } from "@/repositories/luckyDrawRepository";
 import { prizeRepository } from "@/repositories/prizeRepository";
+import { vaultRepository } from "@/repositories/vaultRepository";
 
 const now = () => new Date().toISOString();
 
@@ -121,6 +122,20 @@ export function seedExperienceCampaign(overrides: Partial<{ tokenCapacity: numbe
     startDate: now(),
     endDate: null,
     status: "ACTIVE",
+  });
+}
+
+export function seedVaultOffer(overrides: Partial<{ offerId: string; coinCost: number }> = {}) {
+  return vaultRepository.create({
+    offerId: overrides.offerId ?? "VAULT-000001",
+    enterpriseId: "OMT",
+    partnerName: "Muscat Bay Grill",
+    category: "RESTAURANT",
+    city: "Muscat",
+    icon: "🍽️",
+    discountPercent: 20,
+    description: "Test vault offer.",
+    coinCost: overrides.coinCost ?? 5,
   });
 }
 

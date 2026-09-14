@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "/campaigns", label: "Campaigns" },
   { href: "/packages", label: "Prepaid Packages" },
   { href: "/rewards", label: "Rewards" },
+  { href: "/vault", label: "Vault" },
   { href: "/rewards/lucky-draw", label: "Lucky Draw" },
   { href: "/rewards/spin", label: "Spin & Win" },
 ];
