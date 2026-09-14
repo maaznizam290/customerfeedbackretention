@@ -4,9 +4,17 @@ import {
   PackageUnavailableError,
 } from "@/services/subscriptionService";
 import { rewardService } from "@/services/rewardService";
-import { seedGoldCampaign, seedGoldPackage, seedInactivePackage } from "../helpers/seedFixtures";
+import {
+  seedGoldCampaign,
+  seedGoldPackage,
+  seedInactivePackage,
+  seedOmantelEnterprise,
+  seedPackagePurchaseBehaviour,
+} from "../helpers/seedFixtures";
 
 beforeAll(() => {
+  seedOmantelEnterprise();
+  seedPackagePurchaseBehaviour();
   seedGoldPackage();
   seedGoldCampaign();
   seedInactivePackage();

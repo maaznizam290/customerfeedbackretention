@@ -31,6 +31,43 @@ const pad = (n: number, w: number) => String(n).padStart(w, "0");
 console.log(`Seeding ATHARX database at ${dbFile} ...`);
 
 const seedTx = db.transaction(() => {
+  // ---- Enterprise ----
+  db.prepare(
+    `INSERT INTO enterprises (enterprise_id, name, industry, country, status, created_at, updated_at)
+     VALUES ('OMT', 'Omantel', 'Telecom', 'Oman', 'ACTIVE', @now, @now)`
+  ).run({ now: now() });
+
+  // ---- Behaviours (configurable qualifying rules — see ASSESSMENT.md §9) ----
+  const behaviours = [
+    {
+      behaviorId: "BEH-PACKAGE-PURCHASE",
+      name: "Purchase Any Prepaid Package",
+      eventType: "PACKAGE_PURCHASE",
+      rule: {},
+      description: "Qualifies whenever a customer subscribes to any Omantel prepaid package.",
+    },
+    {
+      behaviorId: "BEH-RECHARGE-005",
+      name: "Recharge OMR 5 or More",
+      eventType: "RECHARGE",
+      rule: { amount_gte: 5 },
+      description: "Qualifies when a recharge event is OMR 5 or greater.",
+    },
+    {
+      behaviorId: "BEH-RECHARGE-BEFORE-EXPIRY",
+      name: "Recharge Before Expiry",
+      eventType: "RECHARGE",
+      rule: {},
+      description: "Demo Campaign Rule: intended to reward recharging before a package expires (prevents inactivity).",
+    },
+  ];
+  for (const b of behaviours) {
+    db.prepare(
+      `INSERT INTO behaviours (behavior_id, name, event_type, rule, description, status, created_at, updated_at)
+       VALUES (@behaviorId, @name, @eventType, @rule, @description, 'ACTIVE', @now, @now)`
+    ).run({ ...b, rule: JSON.stringify(b.rule), now: now() });
+  }
+
   // ---- Packages ----
   const packages = [
     {
@@ -102,82 +139,250 @@ const seedTx = db.transaction(() => {
   }
 
   // ---- Campaigns ----
+  // Ordinary package-subscription reward campaigns: reward_type COIN,
+  // ALL_ELIGIBLE (no draw — every qualifying subscription earns its Coins
+  // immediately). Every qualifying event flows through the same
+  // behaviour-event pipeline the admin Simulator uses (see
+  // behaviourEventService), so each of these MUST reference the shared
+  // BEH-PACKAGE-PURCHASE behaviour plus its own package_id.
   const campaigns = [
     {
       campaignId: "CMP-WELCOME-001",
+      campaignCode: "WELCOME",
+      segment: "PREPAID",
       name: "ATHARX Welcome Reward",
       category: "Signup",
       campaignType: "SIGNUP",
+      behaviourId: null as string | null,
       description: "Join ATHARX and receive a welcome Coin.",
       eligibility: "New ATHARX signups.",
+      rewardType: "COIN",
       rewardCoins: 1,
-      packageId: null,
+      experienceTitle: null as string | null,
+      experienceDescription: null as string | null,
+      tokenCapacity: null as number | null,
+      selectionMethod: "ALL_ELIGIBLE",
+      winnerCount: 1,
+      packageId: null as string | null,
+      status: "ACTIVE",
     },
     {
       campaignId: "CMP-SILVER-001",
+      campaignCode: "SILVER",
+      segment: "PREPAID",
       name: "Silver Package Reward",
       category: "Omantel Prepaid",
       campaignType: "PACKAGE_SUBSCRIPTION",
+      behaviourId: "BEH-PACKAGE-PURCHASE",
       description: "Subscribe to the Silver prepaid plan and earn Coins.",
       eligibility: "Active Silver subscribers.",
+      rewardType: "COIN",
       rewardCoins: 1,
+      experienceTitle: null,
+      experienceDescription: null,
+      tokenCapacity: null,
+      selectionMethod: "ALL_ELIGIBLE",
+      winnerCount: 1,
       packageId: "OMT-SILVER-03",
+      status: "ACTIVE",
     },
     {
       campaignId: "CMP-GOLD-001",
+      campaignCode: "GOLD",
+      segment: "PREPAID",
       name: "Gold Package Reward",
       category: "Omantel Prepaid",
       campaignType: "PACKAGE_SUBSCRIPTION",
+      behaviourId: "BEH-PACKAGE-PURCHASE",
       description: "Subscribe to the Gold prepaid plan and earn Coins.",
       eligibility: "Active Gold subscribers.",
+      rewardType: "COIN",
       rewardCoins: 2,
+      experienceTitle: null,
+      experienceDescription: null,
+      tokenCapacity: null,
+      selectionMethod: "ALL_ELIGIBLE",
+      winnerCount: 1,
       packageId: "OMT-GOLD-05",
+      status: "ACTIVE",
     },
     {
       campaignId: "CMP-PLATINUM-001",
+      campaignCode: "PLAT",
+      segment: "PREPAID",
       name: "Platinum Package Reward",
       category: "Omantel Prepaid",
       campaignType: "PACKAGE_SUBSCRIPTION",
+      behaviourId: "BEH-PACKAGE-PURCHASE",
       description: "Subscribe to the Platinum prepaid plan and earn Coins.",
       eligibility: "Active Platinum subscribers.",
+      rewardType: "COIN",
       rewardCoins: 5,
+      experienceTitle: null,
+      experienceDescription: null,
+      tokenCapacity: null,
+      selectionMethod: "ALL_ELIGIBLE",
+      winnerCount: 1,
       packageId: "OMT-PLATINUM-10",
+      status: "ACTIVE",
+    },
+    {
+      campaignId: "CMP-DATA-001",
+      campaignCode: "DATA",
+      segment: "PREPAID",
+      name: "Data Boost Reward",
+      category: "Omantel Prepaid",
+      campaignType: "PACKAGE_SUBSCRIPTION",
+      behaviourId: "BEH-PACKAGE-PURCHASE",
+      description: "Subscribe to the Data Boost add-on and earn Coins.",
+      eligibility: "Active Data Boost subscribers.",
+      rewardType: "COIN",
+      rewardCoins: 2,
+      experienceTitle: null,
+      experienceDescription: null,
+      tokenCapacity: null,
+      selectionMethod: "ALL_ELIGIBLE",
+      winnerCount: 1,
+      packageId: "OMT-DATA-04",
+      status: "ACTIVE",
+    },
+    {
+      campaignId: "CMP-TALK-001",
+      campaignCode: "TALK",
+      segment: "PREPAID",
+      name: "National Talk Reward",
+      category: "Omantel Prepaid",
+      campaignType: "PACKAGE_SUBSCRIPTION",
+      behaviourId: "BEH-PACKAGE-PURCHASE",
+      description: "Subscribe to National Talk and earn Coins.",
+      eligibility: "Active National Talk subscribers.",
+      rewardType: "COIN",
+      rewardCoins: 1,
+      experienceTitle: null,
+      experienceDescription: null,
+      tokenCapacity: null,
+      selectionMethod: "ALL_ELIGIBLE",
+      winnerCount: 1,
+      packageId: "OMT-TALK-02",
+      status: "ACTIVE",
     },
     {
       campaignId: "CMP-REFER-001",
+      campaignCode: "REFER",
+      segment: "PREPAID",
       name: "Refer a Friend",
       category: "Referral",
       campaignType: "REFERRAL_SUCCESS",
+      behaviourId: null,
       description: "Invite a friend to ATHARX. When they join, you earn Coins.",
       eligibility: "Existing ATHARX customers with a valid referral code.",
+      rewardType: "COIN",
       rewardCoins: 3,
+      experienceTitle: null,
+      experienceDescription: null,
+      tokenCapacity: null,
+      selectionMethod: "ALL_ELIGIBLE",
+      winnerCount: 1,
       packageId: null,
-    },
-    {
-      campaignId: "CMP-RECHARGE-001",
-      name: "Weekend Recharge Boost",
-      category: "Recharge",
-      campaignType: "RECHARGE_THRESHOLD",
-      description: "Recharge above the campaign threshold over the weekend to earn bonus Coins. (Demo Campaign Rule — sandbox data.)",
-      eligibility: "Demo Campaign Rule: recharge above a configurable threshold.",
-      rewardCoins: 2,
-      packageId: null,
+      status: "ACTIVE",
     },
     {
       campaignId: "CMP-LOYALTY-001",
+      campaignCode: "LOYAL",
+      segment: "PREPAID",
       name: "Loyalty Streak",
       category: "Limited-Time Offers",
       campaignType: "GENERAL",
+      behaviourId: null,
       description: "Stay active with ATHARX for consecutive months to unlock bonus Coins. (Demo Campaign Rule — sandbox data.)",
       eligibility: "Demo Campaign Rule: 3 consecutive active months.",
+      rewardType: "COIN",
       rewardCoins: 5,
+      experienceTitle: null,
+      experienceDescription: null,
+      tokenCapacity: null,
+      selectionMethod: "ALL_ELIGIBLE",
+      winnerCount: 1,
       packageId: null,
+      status: "ACTIVE",
+    },
+    // ---- Featured Experience campaigns (§14/§15/§53): limited-inventory,
+    // token-capacitated, selected via a real server-side draw when closed.
+    // Only ONE recharge-triggered experience campaign is ACTIVE at a time
+    // in this seed (F1) — VIP Escape and Desert Adventure start life as
+    // DRAFT, demonstrating the campaign lifecycle an admin can advance
+    // from the Control Panel.
+    {
+      campaignId: "CMP-F1-001",
+      campaignCode: "F1",
+      segment: "PREPAID",
+      name: "ATHARX F1 Experience",
+      category: "Featured Experience",
+      campaignType: "RECHARGE_THRESHOLD",
+      behaviourId: "BEH-RECHARGE-005",
+      description: "Recharge OMR 5 or more to earn a Token toward an unforgettable motorsport experience.",
+      eligibility: "Demo Campaign Rule: recharge OMR 5+ while this campaign is active.",
+      rewardType: "EXPERIENCE",
+      rewardCoins: 1,
+      experienceTitle: "F1 Experience",
+      experienceDescription: "A 2-night hotel stay plus a premium motorsport/Ferrari World-style experience. Demo concept — not a confirmed commercial partnership.",
+      tokenCapacity: 1000,
+      selectionMethod: "RANDOM_DRAW",
+      winnerCount: 1,
+      packageId: null,
+      status: "ACTIVE",
+    },
+    {
+      campaignId: "CMP-VIPESC-001",
+      campaignCode: "VIPESC",
+      segment: "PREPAID",
+      name: "ATHARX VIP Escape",
+      category: "Featured Experience",
+      campaignType: "RECHARGE_THRESHOLD",
+      behaviourId: "BEH-RECHARGE-005",
+      description: "A 2-day premium hotel stay. Demo concept, not yet launched (DRAFT).",
+      eligibility: "Demo Campaign Rule: recharge OMR 5+ while this campaign is active.",
+      rewardType: "HOTEL_STAY",
+      rewardCoins: 1,
+      experienceTitle: "VIP Hotel Escape",
+      experienceDescription: "A 2-day hotel stay. Demo concept — not a confirmed commercial partnership.",
+      tokenCapacity: 500,
+      selectionMethod: "RANDOM_DRAW",
+      winnerCount: 1,
+      packageId: null,
+      status: "DRAFT",
+    },
+    {
+      campaignId: "CMP-DESERT-001",
+      campaignCode: "DESERT",
+      segment: "PREPAID",
+      name: "ATHARX Desert Adventure",
+      category: "Featured Experience",
+      campaignType: "RECHARGE_THRESHOLD",
+      behaviourId: "BEH-RECHARGE-005",
+      description: "A premium Oman desert experience. Demo concept, not yet launched (DRAFT).",
+      eligibility: "Demo Campaign Rule: recharge OMR 5+ while this campaign is active.",
+      rewardType: "ATTRACTION",
+      rewardCoins: 1,
+      experienceTitle: "Desert Adventure",
+      experienceDescription: "A guided premium desert adventure experience. Demo concept — not a confirmed commercial partnership.",
+      tokenCapacity: 500,
+      selectionMethod: "RANDOM_DRAW",
+      winnerCount: 1,
+      packageId: null,
+      status: "DRAFT",
     },
   ];
   for (const c of campaigns) {
     db.prepare(
-      `INSERT INTO campaigns (campaign_id, name, category, campaign_type, description, eligibility, reward_coins, package_id, start_date, end_date, status, created_at, updated_at)
-       VALUES (@campaignId, @name, @category, @campaignType, @description, @eligibility, @rewardCoins, @packageId, @now, NULL, 'ACTIVE', @now, @now)`
+      `INSERT INTO campaigns
+        (campaign_id, campaign_code, enterprise_id, segment, name, category, campaign_type, behaviour_id,
+         description, eligibility, reward_type, reward_coins, experience_title, experience_description,
+         token_capacity, selection_method, winner_count, package_id, start_date, end_date, status, created_at, updated_at)
+       VALUES
+        (@campaignId, @campaignCode, 'OMT', @segment, @name, @category, @campaignType, @behaviourId,
+         @description, @eligibility, @rewardType, @rewardCoins, @experienceTitle, @experienceDescription,
+         @tokenCapacity, @selectionMethod, @winnerCount, @packageId, @now, NULL, @status, @now, @now)`
     ).run({ ...c, now: now() });
   }
 

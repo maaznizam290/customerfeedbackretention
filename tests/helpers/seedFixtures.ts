@@ -1,11 +1,32 @@
 import { packageRepository } from "@/repositories/packageRepository";
 import { campaignRepository } from "@/repositories/campaignRepository";
+import { enterpriseRepository } from "@/repositories/enterpriseRepository";
+import { behaviourRepository } from "@/repositories/behaviourRepository";
 import { milestoneRepository } from "@/repositories/milestoneRepository";
 import { spinRepository } from "@/repositories/spinRepository";
 import { luckyDrawRepository } from "@/repositories/luckyDrawRepository";
 import { prizeRepository } from "@/repositories/prizeRepository";
 
 const now = () => new Date().toISOString();
+
+export function seedOmantelEnterprise() {
+  return enterpriseRepository.create({
+    enterpriseId: "OMT",
+    name: "Omantel",
+    industry: "Telecom",
+    country: "Oman",
+  });
+}
+
+export function seedPackagePurchaseBehaviour() {
+  return behaviourRepository.create({
+    behaviorId: "BEH-PACKAGE-PURCHASE",
+    name: "Purchase Any Prepaid Package",
+    eventType: "PACKAGE_PURCHASE",
+    rule: {},
+    description: "Qualifies whenever a customer subscribes to any prepaid package.",
+  });
+}
 
 export function seedGoldPackage() {
   return packageRepository.create({
@@ -44,13 +65,59 @@ export function seedInactivePackage() {
 export function seedGoldCampaign() {
   return campaignRepository.create({
     campaignId: "CMP-GOLD-001",
+    campaignCode: "GOLD",
+    enterpriseId: "OMT",
+    segment: "PREPAID",
     name: "Gold Package Reward",
     category: "Omantel Prepaid",
     campaignType: "PACKAGE_SUBSCRIPTION",
+    behaviourId: "BEH-PACKAGE-PURCHASE",
     description: "Subscribe to Gold and earn Coins.",
     eligibility: "Active Gold subscribers.",
+    rewardType: "COIN",
     rewardCoins: 2,
+    experienceTitle: null,
+    experienceDescription: null,
+    tokenCapacity: null,
+    selectionMethod: "ALL_ELIGIBLE",
+    winnerCount: 1,
     packageId: "OMT-GOLD-05",
+    startDate: now(),
+    endDate: null,
+    status: "ACTIVE",
+  });
+}
+
+export function seedRechargeBehaviour() {
+  return behaviourRepository.create({
+    behaviorId: "BEH-RECHARGE-005",
+    name: "Recharge OMR 5 or More",
+    eventType: "RECHARGE",
+    rule: { amount_gte: 5 },
+    description: "Qualifies whenever a customer recharges at least OMR 5.",
+  });
+}
+
+export function seedExperienceCampaign(overrides: Partial<{ tokenCapacity: number | null; winnerCount: number }> = {}) {
+  return campaignRepository.create({
+    campaignId: "CMP-F1-001",
+    campaignCode: "F1",
+    enterpriseId: "OMT",
+    segment: "PREPAID",
+    name: "ATHARX F1 Experience",
+    category: "Featured Experience",
+    campaignType: "RECHARGE_THRESHOLD",
+    behaviourId: "BEH-RECHARGE-005",
+    description: "Recharge OMR 5+ for a chance at an F1 experience.",
+    eligibility: "Any prepaid customer recharging OMR 5 or more.",
+    rewardType: "EXPERIENCE",
+    rewardCoins: 1,
+    experienceTitle: "F1 Experience",
+    experienceDescription: "Earn your place in an unforgettable motorsport experience.",
+    tokenCapacity: overrides.tokenCapacity ?? 1000,
+    selectionMethod: "RANDOM_DRAW",
+    winnerCount: overrides.winnerCount ?? 1,
+    packageId: null,
     startDate: now(),
     endDate: null,
     status: "ACTIVE",

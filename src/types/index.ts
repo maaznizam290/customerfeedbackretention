@@ -4,10 +4,24 @@
 export type SubscriptionStatus = "ACTIVE" | "PENDING" | "CANCELLED" | "FAILED";
 export type SubscriberStatus = "ACTIVE" | "INACTIVE";
 export type RewardStatus = "CREDITED" | "PENDING" | "REVERSED";
-export type CampaignStatus = "ACTIVE" | "INACTIVE" | "EXPIRED" | "SANDBOX";
+export type CampaignStatus = "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED" | "COMPLETED" | "INACTIVE" | "EXPIRED" | "SANDBOX";
+export type SelectionMethod = "ALL_ELIGIBLE" | "RANDOM_DRAW";
+export type RewardCatalogType =
+  | "COIN"
+  | "EXPERIENCE"
+  | "VIP_EXPERIENCE"
+  | "PRODUCT"
+  | "CASHBACK"
+  | "DISCOUNT"
+  | "VOUCHER"
+  | "HOTEL_STAY"
+  | "TRAVEL"
+  | "ATTRACTION";
 export type MilestoneStatus = "ACTIVE" | "INACTIVE";
 export type LuckyDrawStatus = "ACTIVE" | "CLOSED" | "COMPLETED";
 export type SpinStatus = "COMPLETED" | "FAILED";
+export type TokenStatus = "RESERVED" | "ISSUED" | "ELIGIBLE" | "SELECTED" | "EXPIRED" | "CANCELLED";
+export type BehaviourEventStatus = "RECEIVED" | "QUALIFIED" | "REJECTED";
 
 export interface Customer {
   id: number;
@@ -17,8 +31,104 @@ export interface Customer {
   passwordHash: string;
   referralCode: string;
   referredByCode: string | null;
+  // Simulation / prepaid-profile fields — null for real signups.
+  isSimulated: boolean;
+  simulationId: string | null;
+  customerType: string;
+  currentPackageId: string | null;
+  lastRechargeAmount: number | null;
+  lastRechargeDate: string | null;
+  packageExpiryDate: string | null;
+  monthlyRechargeCount: number;
+  monthlySpend: number;
+  engagementStatus: string;
+  churnSegment: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Enterprise {
+  id: number;
+  enterpriseId: string; // OMT
+  name: string;
+  industry: string;
+  country: string;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BehaviourRule {
+  amount_gte?: number;
+  [key: string]: unknown;
+}
+
+export interface Behaviour {
+  id: number;
+  behaviorId: string; // BEH-RECHARGE-005
+  name: string;
+  eventType: string; // RECHARGE, PACKAGE_PURCHASE, RENEWAL, REFERRAL, SIGNUP, ...
+  rule: BehaviourRule;
+  description: string;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BehaviourEvent {
+  id: number;
+  eventId: string;
+  enterpriseId: string;
+  customerId: string;
+  subscriberId: string | null;
+  behaviorId: string | null;
+  eventType: string;
+  payload: Record<string, unknown>;
+  qualified: boolean;
+  campaignId: string | null;
+  tokenId: string | null;
+  coinReward: number;
+  status: BehaviourEventStatus;
+  createdAt: string;
+}
+
+export interface Token {
+  id: number;
+  tokenId: string; // OMT-26-F1-000001
+  enterpriseId: string;
+  customerId: string;
+  subscriberId: string | null;
+  campaignId: string;
+  behaviourEventId: string | null;
+  status: TokenStatus;
+  issuedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SelectionRun {
+  id: number;
+  runId: string;
+  campaignId: string;
+  eligibleCount: number;
+  selectedCount: number;
+  executedAt: string;
+  executedBy: string;
+  algorithmVersion: string;
+  status: "COMPLETED" | "FAILED";
+  auditReference: string;
+}
+
+export interface SelectionResult {
+  id: number;
+  resultId: string;
+  runId: string;
+  tokenId: string;
+  customerId: string;
+  subscriberId: string | null;
+  rank: number;
+  status: "SELECTED";
+  selectedAt: string;
 }
 
 export interface Subscriber {
@@ -100,12 +210,22 @@ export type CampaignType =
 export interface Campaign {
   id: number;
   campaignId: string; // CMP-GOLD-001
+  campaignCode: string; // short code used in token ids, e.g. "F1", "GOLD"
+  enterpriseId: string;
+  segment: string;
   name: string;
   category: string;
   campaignType: CampaignType;
+  behaviourId: string | null;
   description: string;
   eligibility: string;
+  rewardType: RewardCatalogType;
   rewardCoins: number;
+  experienceTitle: string | null;
+  experienceDescription: string | null;
+  tokenCapacity: number | null;
+  selectionMethod: SelectionMethod;
+  winnerCount: number;
   packageId: string | null;
   startDate: string;
   endDate: string | null;

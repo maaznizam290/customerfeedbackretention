@@ -57,7 +57,8 @@ client_secret: atharx-demo-secret
 | GET | `/health` | Public | Service health check |
 | POST | `/auth/token` | Public | Issue a Bearer token |
 | GET | `/packages/catalog` | Public | Omantel prepaid package catalog (OMR) |
-| GET | `/campaigns` | Public | Active ATHARX campaigns |
+| GET | `/campaigns` | Public | Active ATHARX campaigns (includes Featured Experience fields) |
+| POST | `/events/qualifying` | Public | Generic qualifying-behaviour ingestion (validate → token → Coin) |
 | GET | `/prizes` | Public | Lucky Draw prize catalog |
 | GET | `/lucky-draws/active` | Public | Active lucky draws |
 | GET | `/lucky-draws/{id}/winners` | Public | Winners for a draw (server-selected) |
@@ -101,6 +102,70 @@ client_secret: atharx-demo-secret
 Seed catalog (demo values — **not** official Omantel pricing): Silver (OMR 3),
 Gold (OMR 5), Platinum (OMR 10), Data Boost (OMR 4, data-only), National Talk
 (OMR 2). See `scripts/seed.ts`.
+
+## Campaigns and the qualifying-event pipeline
+
+### GET /campaigns
+
+```json
+{
+  "campaigns": [
+    {
+      "campaign_id": "CMP-F1-001", "name": "ATHARX F1 Experience", "category": "Featured Experience",
+      "campaign_type": "RECHARGE_THRESHOLD", "description": "Recharge OMR 5 or more to earn a Token toward an unforgettable motorsport experience.",
+      "eligibility": "Demo Campaign Rule: recharge OMR 5+ while this campaign is active.",
+      "reward_type": "EXPERIENCE", "reward_coins": 1,
+      "experience_title": "F1 Experience",
+      "experience_description": "A 2-night hotel stay plus a premium motorsport experience. Demo concept — not a confirmed commercial partnership.",
+      "token_capacity": 1000, "tokens_issued": 4, "package_id": null, "status": "ACTIVE"
+    }
+  ]
+}
+```
+
+`reward_type` values other than `COIN` (`EXPERIENCE`, `VIP_EXPERIENCE`,
+`HOTEL_STAY`, `TRAVEL`, `ATTRACTION`, `PRODUCT`) are rendered as premium
+"Featured Experience" cards on the customer homepage rather than generic
+campaign cards. `experience_title`/`experience_description` are `null` for
+ordinary Coin-reward campaigns. Every Featured Experience is explicitly a
+demo concept, never a confirmed commercial partnership or guaranteed prize.
+
+### POST /events/qualifying
+
+The generic entry point for **any** customer behaviour a connected
+enterprise system wants ATHARX to evaluate — this is what the Control
+Panel's Simulator calls, and conceptually the same endpoint a real Omantel
+recharge/event system would call once integrated (see "Future Omantel
+integration requirements" below).
+
+```json
+// Request
+{
+  "enterprise_id": "OMT",
+  "customer_id": "CUS-OM-000001",
+  "event_type": "RECHARGE",
+  "amount": 5
+}
+
+// Response 200 — qualified
+{
+  "success": true, "qualified": true,
+  "campaign_id": "CMP-F1-001", "token_id": "OMT-26-F1-000005",
+  "coin_reward": 1, "status": "QUALIFIED"
+}
+
+// Response 200 — no active campaign currently qualifies
+{ "success": true, "qualified": false, "campaign_id": null, "token_id": null, "coin_reward": 0, "status": "REJECTED" }
+```
+
+Internally this always runs
+`receive event → match behaviour (behaviourService) → match campaign
+(campaignService) → issue token (tokenService) → credit Coin (rewardService)
+→ record the outcome`, inside one SQLite transaction
+(`behaviourEventService.processEvent`) — the exact same function the
+`/subscriptions/subscribe` success path calls, so a real subscription and a
+simulated event are never handled by different logic. A non-qualifying event
+is a normal `200`, not an error — it simply produces no token and no reward.
 
 ## Subscriber lookup
 
@@ -333,6 +398,52 @@ request that is currently disallowed by application state (as opposed to
 This MVP does **not** implement a churn model — the endpoint only documents
 the response shape a future ML service would populate.
 
+## Admin / Control Panel endpoints
+
+Everything under `/api/v1/admin/*` backs the `/control` Control Panel UI
+(`ARCHITECTURE.md` §15) — a separate surface from the customer-facing app,
+never exposed in customer navigation. As with the rest of this MVP,
+`requireAuth: false` (no production-grade admin auth is implemented; see
+ASSESSMENT.md for the explicit scope call on this).
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/admin/dashboard` | Stat tiles for the Control Panel home screen |
+| GET, POST | `/admin/enterprises` | List / create enterprises |
+| GET, POST | `/admin/behaviours` | List / create behaviours |
+| GET, POST | `/admin/campaigns` | List / create campaigns (full admin shape, incl. lifecycle fields) |
+| PATCH | `/admin/campaigns/{campaignId}/status` | Move a campaign through its lifecycle |
+| GET | `/admin/tokens` | Search/browse issued tokens |
+| GET | `/admin/customers` | List customers (optionally simulated-only) |
+| POST | `/admin/customers/simulate` | Generate a batch of 100/1,000/5,000/10,000 simulated customers |
+| GET | `/admin/selection/{campaignId}` | Selection status/results for a campaign |
+| POST | `/admin/selection/{campaignId}/execute` | Run the Selection Engine on a CLOSED campaign |
+| GET | `/admin/events` | Recent behaviour events (qualified and rejected) |
+
+### POST /admin/customers/simulate
+
+```json
+// Request
+{ "count": 1000 }
+// Response 201
+{ "simulation_id": "SIM-000002", "count": 1000 }
+```
+
+`count` must be one of `100`, `1000`, `5000`, `10000` — a deliberate,
+demo-appropriate scale, never a claim of modeling Omantel's actual ~1.37M
+subscriber base.
+
+### POST /admin/selection/{campaignId}/execute
+
+```json
+{
+  "run": { "run_id": "SEL-RUN-000001", "eligible_count": 812, "selected_count": 1, "algorithm_version": "v1-crypto-random", "audit_reference": "…" },
+  "results": [{ "result_id": "SEL-RES-000001", "token_id": "OMT-26-F1-000317", "customer_id": "CUS-OM-004821", "rank": 1 }]
+}
+```
+
+`409 CAMPAIGN_NOT_CLOSABLE` if the campaign isn't `CLOSED` yet.
+
 ## Idempotency
 
 Any request that provisions or mutates state (`/subscriptions/subscribe`,
@@ -362,7 +473,7 @@ creating a duplicate or granting a second reward. This is enforced by:
 | 401 | `UNAUTHORIZED`, `INVALID_CLIENT` |
 | 403 | `INSUFFICIENT_COINS` |
 | 404 | `PACKAGE_UNAVAILABLE`, `MILESTONE_NOT_FOUND`, `LUCKY_DRAW_NOT_FOUND` |
-| 409 | `DUPLICATE_EMAIL`, `DUPLICATE_MOBILE`, `DUPLICATE_SIGNUP_REWARD`, `COOLDOWN_ACTIVE`, `ALREADY_ENTERED` |
+| 409 | `DUPLICATE_EMAIL`, `DUPLICATE_MOBILE`, `DUPLICATE_SIGNUP_REWARD`, `COOLDOWN_ACTIVE`, `ALREADY_ENTERED`, `INVALID_TRANSITION`, `CAMPAIGN_NOT_CLOSABLE` |
 | 502 | `SUBSCRIPTION_FAILED` (mock Omantel adapter failure) |
 | 503 | `NO_ACTIVE_CAMPAIGN` |
 | 500 | `INTERNAL_ERROR` — a sanitized message only; the real error is logged server-side, never returned to the client |

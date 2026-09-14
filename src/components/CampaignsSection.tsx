@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/apiClient";
 import { CampaignCard } from "@/components/CampaignCard";
+import { isExperienceCampaign } from "@/components/FeaturedExperiencesSection";
 import type { ApiCampaign } from "@/types/api";
 
 export function CampaignsSection({ title = true, limit }: { title?: boolean; limit?: number }) {
@@ -10,7 +11,7 @@ export function CampaignsSection({ title = true, limit }: { title?: boolean; lim
 
   useEffect(() => {
     apiFetch<{ campaigns: ApiCampaign[] }>("/campaigns", { method: "GET" })
-      .then((data) => setCampaigns(data.campaigns))
+      .then((data) => setCampaigns(data.campaigns.filter((c) => !isExperienceCampaign(c))))
       .catch(() => setCampaigns([]));
   }, []);
 

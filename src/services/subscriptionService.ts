@@ -7,8 +7,8 @@ import { subscriberRepository } from "@/repositories/subscriberRepository";
 import { subscriptionRepository } from "@/repositories/subscriptionRepository";
 import { transactionRepository } from "@/repositories/transactionRepository";
 import { getTelecomAdapter } from "@/adapters/telecom";
-import { campaignService } from "@/services/campaignService";
 import { rewardService } from "@/services/rewardService";
+import { behaviourEventService } from "@/services/behaviourEventService";
 import { luckyDrawService } from "@/services/luckyDrawService";
 import { milestoneService } from "@/services/milestoneService";
 import { customerService } from "@/services/customerService";
@@ -89,7 +89,7 @@ export const subscriptionService = {
           kind: "SUCCESS";
           subscriber: Subscriber;
           subscription: Subscription;
-          reward: Reward;
+          reward: Reward | null;
           balanceBefore: number;
           balanceAfter: number;
         };
@@ -162,15 +162,32 @@ export const subscriptionService = {
 
       // Rule 7: only a genuinely ACTIVE subscription reaches this point, so a
       // failed provisioning attempt can never grant the subscription reward.
+      // The reward is issued through the same behaviour-event pipeline the
+      // admin Simulator uses (PACKAGE_PURCHASE qualifies a campaign, which
+      // issues one Token + N Coins) — a subscription is not a special case.
       const balanceBefore = rewardService.getBalance(customerId);
-      const rewardCoins = campaignService.getSubscriptionReward(input.packageId, pkg.campaignRewardCoins);
-      const reward = rewardService.creditReward({
+      const eventResult = behaviourEventService.processEvent({
+        enterpriseId: "OMT",
         customerId,
-        subscriptionId: subscription.subscriptionId,
-        rewardType: "PACKAGE_SUBSCRIPTION_REWARD",
-        coins: rewardCoins,
-        description: `${pkg.name} Subscription Reward`,
+        subscriberId: subscriber.subscriberId,
+        eventType: "PACKAGE_PURCHASE",
+        payload: { package_id: input.packageId, amount: pkg.price, currency: pkg.currency },
+        timestamp: activatedAt,
       });
+      // Fallback for a package with no configured campaign yet: still honor
+      // its own seed-level campaign_reward_coins so subscribing never
+      // silently earns nothing.
+      const reward =
+        eventResult.reward ??
+        (pkg.campaignRewardCoins > 0
+          ? rewardService.creditReward({
+              customerId,
+              subscriptionId: subscription.subscriptionId,
+              rewardType: "PACKAGE_SUBSCRIPTION_REWARD",
+              coins: pkg.campaignRewardCoins,
+              description: `${pkg.name} Subscription Reward`,
+            })
+          : null);
       const balanceAfter = rewardService.getBalance(customerId);
 
       luckyDrawService.grantEntryIfEligible(customerId, "PACKAGE_SUBSCRIPTION");

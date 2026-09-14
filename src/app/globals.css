@@ -25,6 +25,14 @@ body {
   .atharx-input {
     @apply w-full rounded-xl border border-atharx-navy/15 bg-white px-4 py-2.5 text-sm text-atharx-navy placeholder:text-atharx-navy/30 outline-none transition focus:border-atharx-teal focus:ring-2 focus:ring-atharx-teal/30;
   }
+
+  .admin-input {
+    @apply w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-atharx-teal focus:ring-2 focus:ring-atharx-teal/30;
+  }
+
+  .admin-select {
+    @apply w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-white outline-none transition focus:border-atharx-teal focus:ring-2 focus:ring-atharx-teal/30;
+  }
 }
 
 .atharx-scrollbar::-webkit-scrollbar {

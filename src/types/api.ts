@@ -24,7 +24,12 @@ export interface ApiCampaign {
   campaign_type: string;
   description: string;
   eligibility: string;
+  reward_type: string;
   reward_coins: number;
+  experience_title: string | null;
+  experience_description: string | null;
+  token_capacity: number | null;
+  tokens_issued: number;
   package_id: string | null;
   status: string;
 }

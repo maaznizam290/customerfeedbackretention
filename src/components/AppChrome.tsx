@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { SignupModal } from "@/components/SignupModal";
 import { RewardModal } from "@/components/RewardModal";
@@ -9,12 +10,18 @@ import { SignupModalTrigger } from "@/hooks/useSignupModal";
 
 export function AppChrome({ children }: { children: ReactNode }) {
   const { refresh } = useSession();
+  const pathname = usePathname();
   const [signupOpen, setSignupOpen] = useState(false);
   const [reward, setReward] = useState<{ coins: number; balance: number } | null>(null);
 
+  // The ATHARX Control Panel (/control/*) is a separate operator surface
+  // with its own sidebar chrome (see app/control/layout.tsx) — it must
+  // never show the customer navbar or use customer terminology (§50/§51).
+  const isControlPanel = pathname?.startsWith("/control");
+
   return (
     <SignupModalTrigger openSignup={() => setSignupOpen(true)}>
-      <Navbar onOpenSignup={() => setSignupOpen(true)} />
+      {!isControlPanel && <Navbar onOpenSignup={() => setSignupOpen(true)} />}
       {children}
 
       <SignupModal

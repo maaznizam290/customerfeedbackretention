@@ -6,6 +6,7 @@ import { VipProgressCard } from "@/components/VipProgressCard";
 import { SpinTeaserCard } from "@/components/SpinTeaserCard";
 import { LuckyDrawTeaserCard } from "@/components/LuckyDrawTeaserCard";
 import { CampaignsSection } from "@/components/CampaignsSection";
+import { FeaturedExperiencesSection } from "@/components/FeaturedExperiencesSection";
 import { PackagesSection } from "@/components/PackagesSection";
 import { RecentActivity } from "@/components/RecentActivity";
 
@@ -27,6 +28,7 @@ export default function HomePage() {
         </section>
       )}
 
+      <FeaturedExperiencesSection />
       <CampaignsSection limit={3} />
       <PackagesSection />
 

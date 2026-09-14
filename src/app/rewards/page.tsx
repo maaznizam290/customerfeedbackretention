@@ -70,6 +70,10 @@ export default function RewardsPage() {
 
       <div className="mt-8 rounded-3xl border border-atharx-navy/10 bg-white p-6 shadow-card">
         <h2 className="text-lg font-black text-atharx-navy">Reward Activity</h2>
+        <p className="mt-1 text-xs text-atharx-navy/40">
+          Every qualifying action is recorded automatically behind the scenes with a unique, traceable reference — you
+          just watch your Coins grow.
+        </p>
         {items === null ? (
           <div className="mt-4 space-y-2">
             {[...Array(4)].map((_, i) => (

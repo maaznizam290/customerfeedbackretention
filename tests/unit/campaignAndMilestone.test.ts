@@ -4,7 +4,13 @@ import { milestoneService } from "@/services/milestoneService";
 import { rewardService } from "@/services/rewardService";
 import { customerRepository } from "@/repositories/customerRepository";
 import { generateCustomerId } from "@/lib/ids";
-import { seedGoldCampaign, seedGoldPackage, seedVipMilestone } from "../helpers/seedFixtures";
+import {
+  seedGoldCampaign,
+  seedGoldPackage,
+  seedOmantelEnterprise,
+  seedPackagePurchaseBehaviour,
+  seedVipMilestone,
+} from "../helpers/seedFixtures";
 
 function makeCustomer() {
   const customerId = generateCustomerId();
@@ -20,6 +26,8 @@ function makeCustomer() {
 }
 
 beforeAll(() => {
+  seedOmantelEnterprise();
+  seedPackagePurchaseBehaviour();
   seedGoldPackage();
   seedGoldCampaign();
   seedVipMilestone(65);

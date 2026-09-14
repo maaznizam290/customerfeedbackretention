@@ -52,3 +52,29 @@ export function generateReferralCode(fullName: string): string {
   const base = fullName.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 4) || "ATHX";
   return `${base}${pad(nextSequence("referral"), 4)}`;
 }
+
+export function generateBehaviourEventId(): string {
+  return `BEV-${pad(nextSequence("behaviour_event"), 6)}`;
+}
+
+export function generateBehaviourId(eventType: string): string {
+  const code = eventType.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 12) || "GENERAL";
+  return `BEH-${code}-${pad(nextSequence(`behaviour:${code}`), 3)}`;
+}
+
+export function generateCampaignId(campaignCode: string): string {
+  const code = campaignCode.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 10) || "CMP";
+  return `CMP-${code}-${pad(nextSequence(`campaign:${code}`), 3)}`;
+}
+
+export function generateSelectionRunId(): string {
+  return `SEL-RUN-${pad(nextSequence("selection_run"), 6)}`;
+}
+
+export function generateSelectionResultId(): string {
+  return `SEL-RES-${pad(nextSequence("selection_result"), 6)}`;
+}
+
+export function generateSimulationId(): string {
+  return `SIM-${pad(nextSequence("simulation"), 6)}`;
+}

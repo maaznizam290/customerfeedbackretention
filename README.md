@@ -3,12 +3,25 @@
 **Rewards That Keep You Connected**
 *Subscribe. Earn. Save. Stay with Omantel.*
 
-ATHARX is a customer-retention and rewards platform prototype for Omantel prepaid
-customers. It layers a Coin-based reward economy — signup bonuses, package
-subscription rewards, a VIP milestone, an auditable Lucky Draw, and a daily
-Spin & Win — on top of a mock Omantel prepaid subscription flow, so the whole
-customer journey (subscribe → earn → engage → stay) can be demonstrated end to
-end without any live Omantel integration.
+ATHARX is an enterprise-configurable customer engagement and retention engine
+that converts desired customer behaviours into measurable rewards, campaign
+participation and experiences — demonstrated first against Omantel prepaid,
+but not hard-coded to it. It is **not** a generic cashback app: every reward
+ties back to a specific, configurable customer behaviour (a recharge, a
+package subscription, a referral), issued as a unique, auditable Token,
+credited as reusable Coins, and — for limited-inventory experiences —
+resolved by a transparent, server-side Selection Engine. See
+[ASSESSMENT.md](./ASSESSMENT.md) for the full architecture assessment and the
+Token vs. Coin vs. Entry vs. Reward vs. Prize distinction.
+
+The original Coin-based reward economy — signup bonuses, package subscription
+rewards, a VIP milestone, an auditable Lucky Draw, and a daily Spin & Win —
+sits on top of a mock Omantel prepaid subscription flow, so the whole
+customer journey (subscribe → earn → engage → stay) can be demonstrated end
+to end without any live Omantel integration. A separate **ATHARX Control
+Panel** (`/control`) lets an admin configure behaviours, launch campaigns,
+generate simulated customers, and run winner selection — the same engine a
+real Omantel event system could eventually call.
 
 > **This is a prototype/demo.** ATHARX is not connected to any real Omantel
 > production system. All package prices, campaign rules, milestone thresholds
@@ -72,6 +85,15 @@ version):
 9. Go to **Spin & Win** → spin once → **+1 Coin** → the wheel locks for 24
    hours with a live countdown, enforced server-side.
 
+The engine-layer demo (best shown in `/control`, the ATHARX Control Panel):
+
+10. **Simulator** → pick a customer, the "Recharge OMR 5+" behaviour, and an
+    amount ≥ 5 → **SIMULATE BEHAVIOUR** → watch the event qualify, a Token
+    (`OMT-26-F1-…`) get issued, and a Coin get credited, live.
+11. **Campaigns** → close the F1 Experience campaign once enough Tokens are
+    issued → **Selection & Results** → **Execute Selection** → a
+    server-side, audited draw picks the winner(s).
+
 ## Demo credentials
 
 Seeded via `npm run seed` (password for all: `Demo@123`). These deliberately
@@ -88,11 +110,15 @@ two never collide:
 
 ```
 src/
-  app/                  Next.js routes (pages + /api/v1/* route handlers)
+  app/                  Next.js routes: customer-facing pages, /control/*
+                         (ATHARX Control Panel), and /api/v1/* route handlers
   components/           Shared UI components
   hooks/                Client-side React context (session, signup modal)
-  services/             Business logic (reward engine, campaign engine,
-                         subscription flow, VIP/milestone, lucky draw, spin)
+  services/             Business logic — reward engine, campaign engine,
+                         subscription flow, VIP/milestone, lucky draw, spin,
+                         plus the enterprise-agnostic engine layer: behaviour
+                         engine, token engine, qualifying-event pipeline,
+                         selection engine, customer simulator
   repositories/         SQL access, one module per table
   adapters/telecom/     TelecomProviderAdapter interface + MockOmantelAdapter
                          + OmantelProviderAdapter (production placeholder)
@@ -110,9 +136,17 @@ tests/e2e               Playwright — full browser journey
 
 ## Further reading
 
+- [ASSESSMENT.md](./ASSESSMENT.md) — the architecture assessment: current
+  vs. proposed domain model, what was kept/refactored, Token vs. Coin vs.
+  Entry vs. Reward vs. Prize, campaign lifecycle, full user/admin journeys,
+  MVP vs. Phase 2 scope, and documented judgment calls where the brief's
+  requirements would otherwise have produced duplicate concepts or unscalable
+  logic.
 - [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) — endpoints, auth, schemas,
-  error codes, idempotency, environment variables, Omantel integration
+  error codes, idempotency, environment variables, the qualifying-event
+  pipeline, admin/Control Panel endpoints, and Omantel integration
   requirements.
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — system diagram, database schema,
-  gamification loop, future AI/BI architecture, business rules, Phase 2
-  roadmap.
+  gamification loop, the enterprise-agnostic engine layer (Token/Behaviour/
+  Campaign/Selection), the Control Panel, future AI/BI architecture,
+  business rules, Phase 2 roadmap.
