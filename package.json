@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
-    "db:reset": "rm -f db/atharx.db && npm run seed",
+    "db:reset": "node -e \"require('fs').rmSync('db/atharx.db',{force:true})\" && npm run seed",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:api": "vitest run --config vitest.api.config.ts",
