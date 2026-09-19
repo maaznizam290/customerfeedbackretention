@@ -1,10 +1,22 @@
 import { tokenRepository } from "@/repositories/tokenRepository";
 import { nextSequence } from "@/lib/db";
-import type { Token } from "@/types";
+import { AppError } from "@/lib/errors";
+import { auditService } from "@/services/auditService";
+import type { Token, TokenStatus } from "@/types";
 
 function pad(n: number, width: number): string {
   return String(n).padStart(width, "0");
 }
+
+// Exception management (spec §26): HOLD/REVIEW a suspicious token, then
+// RELEASE it back to ISSUED or CANCEL it. Deliberately narrow — this is a
+// manual admin action for a token that has NOT been through selection yet;
+// it never touches SELECTED/FULFILLED tokens (those need a fulfilment
+// workflow, out of this MVP slice's scope).
+const ALLOWED_MANUAL_TRANSITIONS: Record<string, TokenStatus[]> = {
+  ISSUED: ["HOLD", "CANCELLED"],
+  HOLD: ["ISSUED", "CANCELLED"],
+};
 
 /**
  * The Token Engine. A Token is the unique, traceable record of ONE
@@ -50,6 +62,35 @@ export const tokenService = {
 
   getById(tokenId: string): Token | null {
     return tokenRepository.findById(tokenId);
+  },
+
+  /**
+   * Manual exception-management action (spec §26): HOLD a suspicious
+   * token, RELEASE it back to ISSUED, or CANCEL it. Only ISSUED/HOLD
+   * tokens can be moved this way — a token already SELECTED/FULFILLED is
+   * out of scope for this action. Fully audited either way.
+   */
+  setStatus(tokenId: string, nextStatus: TokenStatus, actor = "ADMIN", reason?: string): Token {
+    const token = tokenRepository.findById(tokenId);
+    if (!token) throw new AppError("Token not found.", 404, "TOKEN_NOT_FOUND");
+    const allowed = ALLOWED_MANUAL_TRANSITIONS[token.status] ?? [];
+    if (token.status !== nextStatus && !allowed.includes(nextStatus)) {
+      throw new AppError(`Token cannot move from ${token.status} to ${nextStatus}.`, 409, "INVALID_TOKEN_TRANSITION");
+    }
+    tokenRepository.setStatus(tokenId, nextStatus);
+    const updated = tokenRepository.findById(tokenId)!;
+    const eventType =
+      nextStatus === "HOLD" ? "TOKEN_HELD" : nextStatus === "CANCELLED" ? "TOKEN_CANCELLED" : "TOKEN_RELEASED";
+    auditService.record({
+      eventType,
+      campaignId: updated.campaignId,
+      customerId: updated.customerId,
+      tokenId: updated.tokenId,
+      actor,
+      beforeValue: { status: token.status },
+      afterValue: { status: updated.status, reason: reason ?? null },
+    });
+    return updated;
   },
 
   countForCampaign(campaignId: string): number {

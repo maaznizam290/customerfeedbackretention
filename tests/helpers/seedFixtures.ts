@@ -80,6 +80,7 @@ export function seedGoldCampaign() {
     experienceTitle: null,
     experienceDescription: null,
     tokenCapacity: null,
+    maxTokensPerCustomer: null,
     selectionMethod: "ALL_ELIGIBLE",
     winnerCount: 1,
     packageId: "OMT-GOLD-05",
@@ -99,7 +100,15 @@ export function seedRechargeBehaviour() {
   });
 }
 
-export function seedExperienceCampaign(overrides: Partial<{ tokenCapacity: number | null; winnerCount: number }> = {}) {
+export function seedExperienceCampaign(
+  overrides: Partial<{
+    tokenCapacity: number | null;
+    winnerCount: number;
+    maxTokensPerCustomer: number | null;
+    startDate: string;
+    endDate: string | null;
+  }> = {}
+) {
   return campaignRepository.create({
     campaignId: "CMP-F1-001",
     campaignCode: "F1",
@@ -116,11 +125,12 @@ export function seedExperienceCampaign(overrides: Partial<{ tokenCapacity: numbe
     experienceTitle: "F1 Experience",
     experienceDescription: "Earn your place in an unforgettable motorsport experience.",
     tokenCapacity: overrides.tokenCapacity ?? 1000,
+    maxTokensPerCustomer: overrides.maxTokensPerCustomer ?? null,
     selectionMethod: "RANDOM_DRAW",
     winnerCount: overrides.winnerCount ?? 1,
     packageId: null,
-    startDate: now(),
-    endDate: null,
+    startDate: overrides.startDate ?? now(),
+    endDate: overrides.endDate ?? null,
     status: "ACTIVE",
   });
 }

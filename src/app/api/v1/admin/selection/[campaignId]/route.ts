@@ -26,6 +26,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ camp
                 run_id: run.runId,
                 eligible_count: run.eligibleCount,
                 selected_count: run.selectedCount,
+                eligible_pool_hash: run.eligiblePoolHash,
+                locked_at: run.lockedAt,
                 executed_at: run.executedAt,
                 executed_by: run.executedBy,
                 algorithm_version: run.algorithmVersion,

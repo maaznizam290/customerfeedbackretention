@@ -22,6 +22,8 @@ interface SimResult {
   token_id: string | null;
   coin_reward: number;
   status: string;
+  reason: string | null;
+  is_replay: boolean;
 }
 
 interface EventRow {
@@ -46,6 +48,7 @@ export default function SimulatorPage() {
   const [result, setResult] = useState<SimResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [lastIdempotencyKey, setLastIdempotencyKey] = useState<string | null>(null);
 
   function loadEvents() {
     apiFetch<{ events: EventRow[] }>("/admin/events", { method: "GET" }).then((d) => setEvents(d.events));
@@ -63,8 +66,7 @@ export default function SimulatorPage() {
 
   const selectedBehaviour = behaviours.find((b) => b.behavior_id === behaviorId);
 
-  async function handleSimulate(e: FormEvent) {
-    e.preventDefault();
+  async function submitEvent(idempotencyKey: string) {
     setError(null);
     setResult(null);
     setRunning(true);
@@ -76,15 +78,27 @@ export default function SimulatorPage() {
           customer_id: customerId,
           event_type: selectedBehaviour?.event_type ?? "RECHARGE",
           amount: amount ? Number(amount) : undefined,
+          idempotency_key: idempotencyKey,
         }),
       });
       setResult(response);
+      setLastIdempotencyKey(idempotencyKey);
       loadEvents();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not simulate event.");
     } finally {
       setRunning(false);
     }
+  }
+
+  function handleSimulate(e: FormEvent) {
+    e.preventDefault();
+    return submitEvent(`SIM-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  }
+
+  function handleResubmitDuplicate() {
+    if (!lastIdempotencyKey) return;
+    return submitEvent(lastIdempotencyKey);
   }
 
   return (
@@ -157,9 +171,14 @@ export default function SimulatorPage() {
 
       {result && (
         <div className="mt-6 max-w-xl rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          {result.is_replay && (
+            <p className="mb-3 rounded-full bg-amber-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-400">
+              Duplicate rejected — same idempotency key, original outcome returned, no new Token/Coin
+            </p>
+          )}
           {result.qualified ? (
             <>
-              <p className="text-sm font-black text-emerald-400">BEHAVIOUR QUALIFIED ✓</p>
+              <p className="text-sm font-black text-emerald-400">QUALIFIED ✓</p>
               <div className="mt-3 space-y-2 text-sm">
                 <Row label="Token Issued" value={result.token_id ?? "—"} mono />
                 <Row label="Coin Reward" value={`+${result.coin_reward}`} />
@@ -167,9 +186,20 @@ export default function SimulatorPage() {
               </div>
             </>
           ) : (
-            <p className="text-sm font-black text-slate-400">
-              Event received, but no active campaign currently qualifies for this behaviour/amount.
-            </p>
+            <>
+              <p className="text-sm font-black text-slate-400">NOT QUALIFIED</p>
+              <p className="mt-2 text-sm text-slate-500">{result.reason ?? "No active campaign currently qualifies."}</p>
+            </>
+          )}
+          {!result.is_replay && lastIdempotencyKey && (
+            <button
+              type="button"
+              onClick={handleResubmitDuplicate}
+              disabled={running}
+              className="mt-4 rounded-full border border-slate-700 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 disabled:opacity-60"
+            >
+              Resubmit same event (test duplicate rejection)
+            </button>
           )}
         </div>
       )}

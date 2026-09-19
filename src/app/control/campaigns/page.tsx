@@ -16,6 +16,7 @@ interface Campaign {
   reward_coins: number;
   experience_title: string | null;
   token_capacity: number | null;
+  max_tokens_per_customer: number | null;
   tokens_issued: number;
   selection_method: string;
   winner_count: number;
@@ -71,6 +72,7 @@ const emptyForm = {
   experience_title: "",
   experience_description: "",
   token_capacity: "",
+  max_tokens_per_customer: "",
   selection_method: "ALL_ELIGIBLE" as "ALL_ELIGIBLE" | "RANDOM_DRAW",
   winner_count: "1",
   package_id: "",
@@ -121,6 +123,7 @@ export default function CampaignsPage() {
           experience_title: form.experience_title || undefined,
           experience_description: form.experience_description || undefined,
           token_capacity: form.token_capacity ? Number(form.token_capacity) : undefined,
+          max_tokens_per_customer: form.max_tokens_per_customer ? Number(form.max_tokens_per_customer) : undefined,
           selection_method: form.selection_method,
           winner_count: Number(form.winner_count || 1),
           package_id: form.package_id || undefined,
@@ -187,6 +190,9 @@ export default function CampaignsPage() {
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-300">
                     {c.token_capacity ? `${c.tokens_issued} / ${c.token_capacity}` : `${c.tokens_issued} (unlimited)`}
+                    {c.max_tokens_per_customer && (
+                      <p className="mt-0.5 text-slate-500">max {c.max_tokens_per_customer}/customer</p>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${STATUS_COLORS[c.status] ?? ""}`}>
@@ -240,6 +246,7 @@ export default function CampaignsPage() {
           <textarea placeholder="Experience description (optional)" value={form.experience_description} onChange={(e) => setForm((f) => ({ ...f, experience_description: e.target.value }))} className="admin-input col-span-2" rows={2} />
 
           <input type="number" min={1} placeholder="Token capacity (blank = unlimited)" value={form.token_capacity} onChange={(e) => setForm((f) => ({ ...f, token_capacity: e.target.value }))} className="admin-input" />
+          <input type="number" min={1} placeholder="Max tokens / customer (blank = unlimited)" value={form.max_tokens_per_customer} onChange={(e) => setForm((f) => ({ ...f, max_tokens_per_customer: e.target.value }))} className="admin-input" />
           <select value={form.selection_method} onChange={(e) => setForm((f) => ({ ...f, selection_method: e.target.value as "ALL_ELIGIBLE" | "RANDOM_DRAW" }))} className="admin-select">
             <option value="ALL_ELIGIBLE">ALL_ELIGIBLE (no draw)</option>
             <option value="RANDOM_DRAW">RANDOM_DRAW (server-side draw)</option>

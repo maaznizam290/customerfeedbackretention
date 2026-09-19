@@ -18,6 +18,7 @@ interface CampaignRow {
   experience_title: string | null;
   experience_description: string | null;
   token_capacity: number | null;
+  max_tokens_per_customer: number | null;
   selection_method: string;
   winner_count: number;
   package_id: string | null;
@@ -46,6 +47,7 @@ function mapRow(row: CampaignRow): Campaign {
     experienceTitle: row.experience_title,
     experienceDescription: row.experience_description,
     tokenCapacity: row.token_capacity,
+    maxTokensPerCustomer: row.max_tokens_per_customer,
     selectionMethod: row.selection_method as SelectionMethod,
     winnerCount: row.winner_count,
     packageId: row.package_id,
@@ -65,11 +67,11 @@ export const campaignRepository = {
         `INSERT INTO campaigns
           (campaign_id, campaign_code, enterprise_id, segment, name, category, campaign_type, behaviour_id,
            description, eligibility, reward_type, reward_coins, experience_title, experience_description,
-           token_capacity, selection_method, winner_count, package_id, start_date, end_date, status, created_at, updated_at)
+           token_capacity, max_tokens_per_customer, selection_method, winner_count, package_id, start_date, end_date, status, created_at, updated_at)
          VALUES
           (@campaignId, @campaignCode, @enterpriseId, @segment, @name, @category, @campaignType, @behaviourId,
            @description, @eligibility, @rewardType, @rewardCoins, @experienceTitle, @experienceDescription,
-           @tokenCapacity, @selectionMethod, @winnerCount, @packageId, @startDate, @endDate, @status, @now, @now)`
+           @tokenCapacity, @maxTokensPerCustomer, @selectionMethod, @winnerCount, @packageId, @startDate, @endDate, @status, @now, @now)`
       )
       .run({ ...input, now });
     return this.findByCampaignId(input.campaignId)!;

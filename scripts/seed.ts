@@ -161,6 +161,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: null as string | null,
       experienceDescription: null as string | null,
       tokenCapacity: null as number | null,
+      maxTokensPerCustomer: null as number | null,
       selectionMethod: "ALL_ELIGIBLE",
       winnerCount: 1,
       packageId: null as string | null,
@@ -181,6 +182,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: null,
       experienceDescription: null,
       tokenCapacity: null,
+      maxTokensPerCustomer: null,
       selectionMethod: "ALL_ELIGIBLE",
       winnerCount: 1,
       packageId: "OMT-SILVER-03",
@@ -201,6 +203,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: null,
       experienceDescription: null,
       tokenCapacity: null,
+      maxTokensPerCustomer: null,
       selectionMethod: "ALL_ELIGIBLE",
       winnerCount: 1,
       packageId: "OMT-GOLD-05",
@@ -221,6 +224,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: null,
       experienceDescription: null,
       tokenCapacity: null,
+      maxTokensPerCustomer: null,
       selectionMethod: "ALL_ELIGIBLE",
       winnerCount: 1,
       packageId: "OMT-PLATINUM-10",
@@ -241,6 +245,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: null,
       experienceDescription: null,
       tokenCapacity: null,
+      maxTokensPerCustomer: null,
       selectionMethod: "ALL_ELIGIBLE",
       winnerCount: 1,
       packageId: "OMT-DATA-04",
@@ -261,6 +266,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: null,
       experienceDescription: null,
       tokenCapacity: null,
+      maxTokensPerCustomer: null,
       selectionMethod: "ALL_ELIGIBLE",
       winnerCount: 1,
       packageId: "OMT-TALK-02",
@@ -281,6 +287,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: null,
       experienceDescription: null,
       tokenCapacity: null,
+      maxTokensPerCustomer: null,
       selectionMethod: "ALL_ELIGIBLE",
       winnerCount: 1,
       packageId: null,
@@ -301,6 +308,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: null,
       experienceDescription: null,
       tokenCapacity: null,
+      maxTokensPerCustomer: null,
       selectionMethod: "ALL_ELIGIBLE",
       winnerCount: 1,
       packageId: null,
@@ -327,6 +335,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: "F1 Experience",
       experienceDescription: "A 2-night hotel stay plus a premium motorsport/Ferrari World-style experience. Demo concept — not a confirmed commercial partnership.",
       tokenCapacity: 1000,
+      maxTokensPerCustomer: 3,
       selectionMethod: "RANDOM_DRAW",
       winnerCount: 1,
       packageId: null,
@@ -347,6 +356,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: "VIP Hotel Escape",
       experienceDescription: "A 2-day hotel stay. Demo concept — not a confirmed commercial partnership.",
       tokenCapacity: 500,
+      maxTokensPerCustomer: 3,
       selectionMethod: "RANDOM_DRAW",
       winnerCount: 1,
       packageId: null,
@@ -367,6 +377,7 @@ const seedTx = db.transaction(() => {
       experienceTitle: "Desert Adventure",
       experienceDescription: "A guided premium desert adventure experience. Demo concept — not a confirmed commercial partnership.",
       tokenCapacity: 500,
+      maxTokensPerCustomer: 3,
       selectionMethod: "RANDOM_DRAW",
       winnerCount: 1,
       packageId: null,
@@ -378,11 +389,11 @@ const seedTx = db.transaction(() => {
       `INSERT INTO campaigns
         (campaign_id, campaign_code, enterprise_id, segment, name, category, campaign_type, behaviour_id,
          description, eligibility, reward_type, reward_coins, experience_title, experience_description,
-         token_capacity, selection_method, winner_count, package_id, start_date, end_date, status, created_at, updated_at)
+         token_capacity, max_tokens_per_customer, selection_method, winner_count, package_id, start_date, end_date, status, created_at, updated_at)
        VALUES
         (@campaignId, @campaignCode, 'OMT', @segment, @name, @category, @campaignType, @behaviourId,
          @description, @eligibility, @rewardType, @rewardCoins, @experienceTitle, @experienceDescription,
-         @tokenCapacity, @selectionMethod, @winnerCount, @packageId, @now, NULL, @status, @now, @now)`
+         @tokenCapacity, @maxTokensPerCustomer, @selectionMethod, @winnerCount, @packageId, @now, NULL, @status, @now, @now)`
     ).run({ ...c, now: now() });
   }
 

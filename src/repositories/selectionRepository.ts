@@ -7,6 +7,8 @@ interface RunRow {
   campaign_id: string;
   eligible_count: number;
   selected_count: number;
+  eligible_pool_hash: string;
+  locked_at: string;
   executed_at: string;
   executed_by: string;
   algorithm_version: string;
@@ -21,6 +23,8 @@ function mapRun(row: RunRow): SelectionRun {
     campaignId: row.campaign_id,
     eligibleCount: row.eligible_count,
     selectedCount: row.selected_count,
+    eligiblePoolHash: row.eligible_pool_hash,
+    lockedAt: row.locked_at,
     executedAt: row.executed_at,
     executedBy: row.executed_by,
     algorithmVersion: row.algorithm_version,
@@ -59,12 +63,37 @@ export const selectionRepository = {
   createRun(input: Omit<SelectionRun, "id">): SelectionRun {
     getDb()
       .prepare(
-        `INSERT INTO selection_runs (run_id, campaign_id, eligible_count, selected_count, executed_at, executed_by, algorithm_version, status, audit_reference)
-         VALUES (@runId, @campaignId, @eligibleCount, @selectedCount, @executedAt, @executedBy, @algorithmVersion, @status, @auditReference)`
+        `INSERT INTO selection_runs (run_id, campaign_id, eligible_count, selected_count, eligible_pool_hash, locked_at, executed_at, executed_by, algorithm_version, status, audit_reference)
+         VALUES (@runId, @campaignId, @eligibleCount, @selectedCount, @eligiblePoolHash, @lockedAt, @executedAt, @executedBy, @algorithmVersion, @status, @auditReference)`
       )
       .run(input);
     const row = getDb().prepare(`SELECT * FROM selection_runs WHERE run_id = ?`).get(input.runId) as RunRow;
     return mapRun(row);
+  },
+
+  markExecuted(runId: string, input: { executedAt: string; selectedCount: number; status: SelectionRun["status"] }): SelectionRun {
+    getDb()
+      .prepare(`UPDATE selection_runs SET executed_at = ?, selected_count = ?, status = ? WHERE run_id = ?`)
+      .run(input.executedAt, input.selectedCount, input.status, runId);
+    const row = getDb().prepare(`SELECT * FROM selection_runs WHERE run_id = ?`).get(runId) as RunRow;
+    return mapRun(row);
+  },
+
+  savePoolSnapshot(runId: string, tokens: { tokenId: string; customerId: string; subscriberId: string | null }[]): void {
+    const insert = getDb().prepare(
+      `INSERT INTO selection_pool_tokens (run_id, token_id, customer_id, subscriber_id) VALUES (?, ?, ?, ?)`
+    );
+    const insertMany = getDb().transaction((rows: typeof tokens) => {
+      for (const t of rows) insert.run(runId, t.tokenId, t.customerId, t.subscriberId);
+    });
+    insertMany(tokens);
+  },
+
+  getPoolSnapshot(runId: string): { tokenId: string; customerId: string; subscriberId: string | null }[] {
+    const rows = getDb()
+      .prepare(`SELECT token_id, customer_id, subscriber_id FROM selection_pool_tokens WHERE run_id = ? ORDER BY id ASC`)
+      .all(runId) as { token_id: string; customer_id: string; subscriber_id: string | null }[];
+    return rows.map((r) => ({ tokenId: r.token_id, customerId: r.customer_id, subscriberId: r.subscriber_id }));
   },
 
   createResult(input: Omit<SelectionResult, "id">): SelectionResult {

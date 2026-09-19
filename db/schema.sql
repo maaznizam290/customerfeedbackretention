@@ -147,6 +147,9 @@ CREATE TABLE IF NOT EXISTS campaigns (
   experience_title TEXT,
   experience_description TEXT,
   token_capacity INTEGER,
+  -- Enterprise-configurable per-customer cap (spec: "Maximum Tokens/Customer").
+  -- NULL means unlimited — a business-policy default, never hard-coded.
+  max_tokens_per_customer INTEGER,
   selection_method TEXT NOT NULL DEFAULT 'ALL_ELIGIBLE',
   winner_count INTEGER NOT NULL DEFAULT 1,
   package_id TEXT REFERENCES packages(package_id),
@@ -163,6 +166,10 @@ CREATE TABLE IF NOT EXISTS campaigns (
 CREATE TABLE IF NOT EXISTS behaviour_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_id TEXT NOT NULL UNIQUE,
+  -- Caller-supplied idempotency key (the enterprise's own upstream event
+  -- id). NULL for callers that don't provide one; a repeat key returns the
+  -- original outcome instead of reprocessing (spec §13, mandatory).
+  idempotency_key TEXT,
   enterprise_id TEXT NOT NULL REFERENCES enterprises(enterprise_id),
   customer_id TEXT NOT NULL REFERENCES customers(customer_id),
   subscriber_id TEXT,
@@ -174,11 +181,18 @@ CREATE TABLE IF NOT EXISTS behaviour_events (
   token_id TEXT,
   coin_reward INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'RECEIVED',
+  -- Human-readable reason the event did NOT qualify (NULL when qualified),
+  -- e.g. "Recharge value OMR 2 is below required threshold OMR 5." — the
+  -- Event Simulator and audit trail both surface this directly.
+  rejection_reason TEXT,
   created_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_behaviour_events_customer ON behaviour_events(customer_id);
 CREATE INDEX IF NOT EXISTS idx_behaviour_events_campaign ON behaviour_events(campaign_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_behaviour_events_idempotency_key
+  ON behaviour_events(idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 
 -- A Token is the unique, traceable record of ONE qualifying event for ONE
 -- campaign — distinct from Coins (the fungible loyalty balance in
@@ -216,12 +230,34 @@ CREATE TABLE IF NOT EXISTS selection_runs (
   campaign_id TEXT NOT NULL REFERENCES campaigns(campaign_id),
   eligible_count INTEGER NOT NULL,
   selected_count INTEGER NOT NULL,
+  -- Tamper-evidence for the locked eligible pool (spec §24/§42): a SHA-256
+  -- hash of the sorted eligible token ids, computed at the moment the pool
+  -- is locked (immediately before the draw), so anyone can later verify the
+  -- exact pool a winner was drawn from was never altered after the fact.
+  -- This is an MVP integrity aid, not a regulatory-certified randomisation.
+  eligible_pool_hash TEXT NOT NULL,
+  locked_at TEXT NOT NULL,
   executed_at TEXT NOT NULL,
   executed_by TEXT NOT NULL DEFAULT 'ADMIN',
   algorithm_version TEXT NOT NULL DEFAULT 'v1-crypto-random',
   status TEXT NOT NULL DEFAULT 'COMPLETED',
   audit_reference TEXT NOT NULL
 );
+
+-- The exact snapshot of token ids that made up the LOCKED eligible pool for
+-- a run, captured the instant the pool is locked. Selection always draws
+-- from this frozen list — never a fresh re-query at draw time — so a token
+-- issued after lock can never sneak into the draw, and a token revalidated
+-- as no longer eligible between lock and draw is detectable (spec §24/§25).
+CREATE TABLE IF NOT EXISTS selection_pool_tokens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL REFERENCES selection_runs(run_id),
+  token_id TEXT NOT NULL,
+  customer_id TEXT NOT NULL,
+  subscriber_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_selection_pool_tokens_run ON selection_pool_tokens(run_id);
 
 CREATE TABLE IF NOT EXISTS selection_results (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -433,6 +469,34 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   metadata TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL
 );
+
+-- The centralized, structured audit trail (spec §28/§42): every
+-- integrity-relevant action across the platform writes exactly one row
+-- here, through auditService only — no other write path exists, so the
+-- trail can never be partial or bypassed by a route/service that forgets
+-- to call it in one place but not another. Distinct from `analytics_events`
+-- (a product-analytics/UI-funnel feed with no admin-actor attribution);
+-- this table is compliance/evidence-oriented and is the one surfaced in
+-- the /control/audit admin screen with filters.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  audit_id TEXT NOT NULL UNIQUE,
+  event_type TEXT NOT NULL,
+  enterprise_id TEXT,
+  campaign_id TEXT,
+  customer_id TEXT,
+  token_id TEXT,
+  actor TEXT NOT NULL DEFAULT 'SYSTEM',
+  before_value TEXT,
+  after_value TEXT,
+  system_identifier TEXT NOT NULL DEFAULT 'atharx-engine',
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_event_type ON audit_log(event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_log_campaign ON audit_log(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_customer ON audit_log(customer_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
 
 CREATE TABLE IF NOT EXISTS id_counters (
   name TEXT PRIMARY KEY,

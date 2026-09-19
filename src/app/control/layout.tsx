@@ -14,6 +14,7 @@ import {
   FlaskConical,
   Gift,
   ArrowLeftRight,
+  ShieldCheck,
 } from "lucide-react";
 
 const NAV = [
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/control/rewards", label: "Rewards", icon: Gift },
   { href: "/control/selection", label: "Selection & Results", icon: Shuffle },
   { href: "/control/simulator", label: "Simulator", icon: FlaskConical },
+  { href: "/control/audit", label: "Audit Logs", icon: ShieldCheck },
 ];
 
 export default function ControlLayout({ children }: { children: ReactNode }) {

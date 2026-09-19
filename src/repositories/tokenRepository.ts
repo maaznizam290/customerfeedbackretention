@@ -63,6 +63,13 @@ export const tokenRepository = {
     return row.c;
   },
 
+  countForCustomerInCampaign(campaignId: string, customerId: string): number {
+    const row = getDb()
+      .prepare(`SELECT COUNT(*) as c FROM tokens WHERE campaign_id = ? AND customer_id = ?`)
+      .get(campaignId, customerId) as { c: number };
+    return row.c;
+  },
+
   listEligibleForCampaign(campaignId: string): Token[] {
     const rows = getDb()
       .prepare(`SELECT * FROM tokens WHERE campaign_id = ? AND status = 'ISSUED' ORDER BY id ASC`)

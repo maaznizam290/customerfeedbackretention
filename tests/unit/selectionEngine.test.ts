@@ -83,6 +83,7 @@ describe("selectionService (selection engine)", () => {
       experienceTitle: "Small Pool",
       experienceDescription: "Test only.",
       tokenCapacity: 1,
+      maxTokensPerCustomer: null,
       selectionMethod: "RANDOM_DRAW",
       winnerCount: 5,
       packageId: null,

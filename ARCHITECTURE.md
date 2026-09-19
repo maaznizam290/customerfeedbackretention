@@ -298,6 +298,12 @@ UI component decides how many Coins anything is worth (Rule 4).
 | 11 | Every qualifying customer action — real or simulated — flows through one code path | `behaviourEventService.processEvent` is called by both `POST /events/qualifying` (the admin Simulator) and `subscriptionService.subscribe`, so demo and production behaviour can never drift apart |
 | 12 | A campaign can only move through its declared lifecycle | `campaignService.setStatus` enforces `ALLOWED_TRANSITIONS` (DRAFT→ACTIVE→PAUSED/CLOSED→COMPLETED); an invalid hop throws `InvalidCampaignTransitionError` instead of silently succeeding |
 | 13 | Selection only ever runs on a CLOSED campaign, and only server-side | `selectionService.executeSelection` throws `CampaignNotClosableError` otherwise; winners are drawn with `crypto.randomInt`, never a frontend-computed index |
+| 14 | A repeated qualifying-event idempotency key returns the original outcome, never a second token/reward | `behaviour_events.idempotency_key` has a partial `UNIQUE` index; `behaviourEventService.processEvent` checks it first, inside the same transaction, and short-circuits to the stored outcome on a match |
+| 15 | Maximum Tokens/Customer is an Enterprise-configurable business policy, never hard-coded | `campaigns.max_tokens_per_customer` (nullable = unlimited); `campaignService.findQualifyingCampaign` checks `tokenRepository.countForCustomerInCampaign` per candidate campaign and reports the exact reason when a customer is capped |
+| 16 | A campaign's date window is enforced the same way its capacity is | `findQualifyingCampaign` compares `start_date`/`end_date` against the event's timestamp (server clock unless the caller supplies one) before ever considering a campaign a match |
+| 17 | Every integrity-relevant action writes exactly one row to a single, centralized audit trail | `auditService.record` is the only write path to `audit_log`; campaign lifecycle, event receipt/rejection, token issuance, pool locking, selection, and exception management all call through it — never a route/service writing its own ad hoc log |
+| 18 | A Selection run draws only from the pool exactly as it stood the instant it was locked, and re-validates each tentative winner before finalizing | `selectionService.lockEligiblePool` snapshots eligible token ids into `selection_pool_tokens` with a SHA-256 hash of the sorted set (`eligible_pool_hash`); `executeSelection` draws only from that frozen snapshot and re-fetches each candidate's live token status, skipping (and auditing) any that changed since lock in favour of an alternate |
+| 19 | A token can be held or cancelled for exception review, but never silently deleted, and never once it has already been selected | `tokenService.setStatus` only allows `ISSUED ⇄ HOLD` and `→ CANCELLED`; a `SELECTED`/`FULFILLED` token is outside this action's reach, and every transition is audited (`TOKEN_HELD`/`TOKEN_RELEASED`/`TOKEN_CANCELLED`) |
 
 ## 6. Analytics events
 
@@ -408,13 +414,28 @@ contrast; verify with a contrast checker before any palette change.
   sequence scoping, the qualifying-event pipeline (qualify → token → coin,
   and the rejected/no-campaign path), token-capacity oversell prevention,
   and the selection engine's lifecycle guard + CSPRNG draw + audit trail.
+  A dedicated `engineHardening.test.ts` suite (each test isolated behind
+  its own throwaway behaviour+campaign) covers: qualifying-event
+  idempotency replay, the per-customer token limit, campaign date-window
+  rejection (both not-yet-started and expired) with the exact reason
+  string surfaced, the centralized audit log recording `TOKEN_ISSUED` /
+  `EVENT_REJECTED` / `CAMPAIGN_STATUS_CHANGED` with correct before/after
+  values, selection pool locking with a verifiable SHA-256 hash, refusing
+  a double lock or a double execution, and winner revalidation actually
+  skipping HELD tokens in favour of an alternate — with the audit trail
+  proving both the rejection and the alternate pick happened.
 - **API tests** (`tests/api`, `npm run test:api`): the same rules exercised
   over real HTTP against an isolated `next dev` instance + throwaway
   database — auth (token issuance, rejection, protected-route enforcement),
   public catalog browsing, the signup → subscribe → reward-ledger golden
   path, idempotent replay, and (against this demo build's `cooldown_seconds:
   0` config) that Spin & Win stays eligible across repeated back-to-back
-  spins while idempotency still holds.
+  spins while idempotency still holds. A separate "Engine layer over HTTP"
+  suite drives the full admin surface end to end: qualifying-event
+  idempotency and non-qualification reasons over real HTTP, campaign
+  creation with `max_tokens_per_customer` actually enforced, the complete
+  close → lock (hash) → execute → audit selection lifecycle, and token
+  exception management (HOLD/RELEASE) via `/admin/tokens/:id/status`.
 - **E2E test** (`tests/e2e`, `npm run test:e2e`): a single Playwright
   spec drives a real Chromium browser through the mandatory demo journey —
   signup landing at 0 Coins with no reward modal, package subscription, the
@@ -536,7 +557,30 @@ A second, separate UI surface from the customer-facing app, sharing no
 navigation or terminology with it (customers never see "Token," "Behaviour,"
 or "Selection Run" — those are Control Panel concepts). Sections: Dashboard,
 Enterprises, Behaviours, Campaigns, Tokens, Customers, Simulator, Rewards
-Catalog, Selection & Results. This is where an Omantel stakeholder would
-configure a behaviour, launch a campaign, generate a simulated customer
-batch, and run a selection — the same 19-step story documented in
-ASSESSMENT.md's "complete admin journey."
+Catalog, Selection & Results, Audit Logs. This is where an Omantel
+stakeholder would configure a behaviour, launch a campaign, generate a
+simulated customer batch, and run a selection — the same 19-step story
+documented in ASSESSMENT.md's "complete admin journey."
+
+The **Tokens** screen doubles as the exception-management console: an
+ISSUED token can be put on **Hold** (flagged for review) or **Cancelled**;
+a HELD token can be **Released** back to ISSUED. A token that has already
+reached SELECTED is outside this action's reach — exception management is
+deliberately scoped to the pre-selection lifecycle only.
+
+The **Selection & Results** screen makes the Close → Lock → Execute
+sequence an explicit two-step admin action rather than one opaque button:
+**Lock Eligible Pool** snapshots every ISSUED token for a CLOSED campaign
+and displays its SHA-256 integrity hash immediately; **Execute Selection**
+only appears once a pool is locked, and the draw that follows revalidates
+each tentative winner's live token status before finalizing it — a token
+put on Hold after lock is skipped in favour of an alternate, visibly, with
+both outcomes in the Audit Logs screen.
+
+The **Audit Logs** screen (`/control/audit`) is the centralized, filterable
+compliance trail (spec-equivalent term: "audit evidence covering the full
+campaign lifecycle") — distinct from the lightweight `analytics_events`
+product-analytics feed described in §6. Every campaign lifecycle change,
+event receipt/rejection, token issuance/hold/release/cancellation, pool
+lock, and selection outcome writes exactly one row here via
+`auditService.record`, with before/after values where relevant.

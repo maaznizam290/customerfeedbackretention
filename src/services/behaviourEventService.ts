@@ -4,7 +4,10 @@ import { behaviourService } from "@/services/behaviourService";
 import { campaignService } from "@/services/campaignService";
 import { tokenService } from "@/services/tokenService";
 import { rewardService } from "@/services/rewardService";
+import { auditService } from "@/services/auditService";
 import { behaviourEventRepository } from "@/repositories/behaviourEventRepository";
+import { campaignRepository } from "@/repositories/campaignRepository";
+import { tokenRepository } from "@/repositories/tokenRepository";
 import type { BehaviourEvent, Campaign, CampaignType, Reward, RewardType, Token } from "@/types";
 
 // Keeps the reward ledger's `type` column meaningful (and backward
@@ -25,6 +28,9 @@ export interface QualifyingEventInput {
   eventType: string;
   payload: Record<string, unknown>;
   timestamp?: string;
+  /** Caller-supplied idempotency key (spec §13). A repeat key returns the
+   *  original outcome (isReplay: true) instead of reprocessing. */
+  idempotencyKey?: string | null;
 }
 
 export interface QualifyingEventResult {
@@ -34,6 +40,27 @@ export interface QualifyingEventResult {
   token: Token | null;
   coinReward: number;
   reward: Reward | null;
+  /** Human-readable reason the event did not qualify — null when qualified. */
+  reason: string | null;
+  isReplay: boolean;
+}
+
+function reconstructResult(event: BehaviourEvent): QualifyingEventResult {
+  const campaign = event.campaignId ? campaignRepository.findByCampaignId(event.campaignId) : null;
+  const token = event.tokenId ? tokenRepository.findById(event.tokenId) : null;
+  return {
+    event,
+    qualified: event.qualified,
+    campaign,
+    token,
+    coinReward: event.coinReward,
+    // The original reward row's id isn't stored on the event row itself;
+    // for a replay it is enough that the caller sees the same token/coin
+    // outcome and knows no *new* reward is credited a second time.
+    reward: null,
+    reason: event.rejectionReason,
+    isReplay: true,
+  };
 }
 
 /**
@@ -55,17 +82,40 @@ export const behaviourEventService = {
   processEvent(input: QualifyingEventInput): QualifyingEventResult {
     const db = getDb();
     const run = db.transaction((): QualifyingEventResult => {
+      // Idempotency (spec §13, mandatory): a repeat idempotency_key returns
+      // the original outcome untouched — no second token, no second reward,
+      // no second audit entry for the event's own qualification.
+      if (input.idempotencyKey) {
+        const existing = behaviourEventRepository.findByIdempotencyKey(input.idempotencyKey);
+        if (existing) return reconstructResult(existing);
+      }
+
       const behaviour = behaviourService.findQualifying(input.eventType, input.payload);
       const packageId =
         typeof input.payload.package_id === "string" ? (input.payload.package_id as string) : null;
 
-      const campaign = behaviour
-        ? campaignService.findQualifyingCampaign(behaviour.behaviorId, { packageId })
-        : null;
+      const lookup = behaviour
+        ? campaignService.findQualifyingCampaign(behaviour.behaviorId, {
+            packageId,
+            customerId: input.customerId,
+            now: input.timestamp ? new Date(input.timestamp) : undefined,
+          })
+        : { campaign: null, reason: "No behaviour rule matches this event type/value." };
 
-      if (!behaviour || !campaign) {
+      auditService.record({
+        eventType: "EVENT_RECEIVED",
+        enterpriseId: input.enterpriseId,
+        customerId: input.customerId,
+        campaignId: lookup.campaign?.campaignId ?? null,
+        actor: "SYSTEM",
+        afterValue: { eventType: input.eventType, payload: input.payload },
+      });
+
+      if (!behaviour || !lookup.campaign) {
+        const reason = lookup.reason ?? "No active campaign currently qualifies.";
         const event = behaviourEventRepository.create({
           eventId: generateBehaviourEventId(),
+          idempotencyKey: input.idempotencyKey ?? null,
           enterpriseId: input.enterpriseId,
           customerId: input.customerId,
           subscriberId: input.subscriberId ?? null,
@@ -77,9 +127,19 @@ export const behaviourEventService = {
           tokenId: null,
           coinReward: 0,
           status: "REJECTED",
+          rejectionReason: reason,
         });
-        return { event, qualified: false, campaign: null, token: null, coinReward: 0, reward: null };
+        auditService.record({
+          eventType: "EVENT_REJECTED",
+          enterpriseId: input.enterpriseId,
+          customerId: input.customerId,
+          actor: "SYSTEM",
+          afterValue: { eventId: event.eventId, reason },
+        });
+        return { event, qualified: false, campaign: null, token: null, coinReward: 0, reward: null, reason, isReplay: false };
       }
+
+      const campaign = lookup.campaign;
 
       // The token id needs the event id it was issued from, so the id is
       // generated first and the behaviour_events row written once, last,
@@ -96,6 +156,16 @@ export const behaviourEventService = {
         issuedAt: input.timestamp ? new Date(input.timestamp) : new Date(),
       });
 
+      auditService.record({
+        eventType: "TOKEN_ISSUED",
+        enterpriseId: input.enterpriseId,
+        campaignId: campaign.campaignId,
+        customerId: input.customerId,
+        tokenId: token.tokenId,
+        actor: "SYSTEM",
+        afterValue: { tokenId: token.tokenId, campaignId: campaign.campaignId },
+      });
+
       const coinReward = campaign.rewardCoins;
       const reward =
         coinReward > 0
@@ -109,6 +179,7 @@ export const behaviourEventService = {
 
       const event = behaviourEventRepository.create({
         eventId,
+        idempotencyKey: input.idempotencyKey ?? null,
         enterpriseId: input.enterpriseId,
         customerId: input.customerId,
         subscriberId: input.subscriberId ?? null,
@@ -120,9 +191,10 @@ export const behaviourEventService = {
         tokenId: token.tokenId,
         coinReward,
         status: "QUALIFIED",
+        rejectionReason: null,
       });
 
-      return { event, qualified: true, campaign, token, coinReward, reward };
+      return { event, qualified: true, campaign, token, coinReward, reward, reason: null, isReplay: false };
     });
 
     return run();

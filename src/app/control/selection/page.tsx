@@ -21,8 +21,11 @@ interface SelectionDetail {
     run_id: string;
     eligible_count: number;
     selected_count: number;
+    eligible_pool_hash: string;
+    locked_at: string;
     executed_at: string;
     algorithm_version: string;
+    status: string;
     audit_reference: string;
   } | null;
   results: { result_id: string; token_id: string; customer_id: string; customer_name: string | null; rank: number }[];
@@ -48,6 +51,19 @@ export default function SelectionPage() {
     apiFetch<SelectionDetail>(`/admin/selection/${campaignId}`, { method: "GET" }).then(setDetail);
   }
 
+  async function lockPool(campaignId: string) {
+    setRunning(true);
+    setError(null);
+    try {
+      await apiFetch(`/admin/selection/${campaignId}/lock`, { method: "POST" });
+      loadDetail(campaignId);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not lock the eligible pool.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
   async function execute(campaignId: string) {
     setRunning(true);
     setError(null);
@@ -66,9 +82,13 @@ export default function SelectionPage() {
     <div>
       <h1 className="text-2xl font-black text-white">Selection & Results</h1>
       <p className="mt-1 text-sm text-slate-400">
-        Limited-inventory experience campaigns (RANDOM_DRAW) only. Close a campaign in the Campaigns screen first, then
-        run selection here — winners are chosen server-side (CSPRNG) with a full audit trail. This demonstrates
-        mechanics only; it is not a regulated draw.
+        Limited-inventory experience campaigns (RANDOM_DRAW) only. Close a campaign in the Campaigns screen, lock its
+        eligible pool (a tamper-evident snapshot + integrity hash), then execute the draw — each tentative winner is
+        revalidated against its live token status before being finalized, with an alternate drawn automatically if it
+        fails. Every step is fully audited.
+      </p>
+      <p className="mt-2 inline-block rounded-full bg-slate-800 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+        MVP Digital Selection — production certification/randomisation validation required for live campaigns
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -99,16 +119,28 @@ export default function SelectionPage() {
         <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-white">{detail.campaign_id}</h2>
-            {detail.campaign_status === "CLOSED" && !detail.run && (
-              <button
-                type="button"
-                disabled={running}
-                onClick={() => execute(detail.campaign_id)}
-                className="rounded-full bg-atharx-teal px-5 py-2 text-sm font-black text-atharx-ink disabled:opacity-60"
-              >
-                {running ? "Running…" : "Execute Selection"}
-              </button>
-            )}
+            <div className="flex gap-2">
+              {detail.campaign_status === "CLOSED" && !detail.run && (
+                <button
+                  type="button"
+                  disabled={running}
+                  onClick={() => lockPool(detail.campaign_id)}
+                  className="rounded-full border border-atharx-teal px-5 py-2 text-sm font-black text-atharx-teal disabled:opacity-60"
+                >
+                  {running ? "Locking…" : "Lock Eligible Pool"}
+                </button>
+              )}
+              {detail.run?.status === "LOCKED" && (
+                <button
+                  type="button"
+                  disabled={running}
+                  onClick={() => execute(detail.campaign_id)}
+                  className="rounded-full bg-atharx-teal px-5 py-2 text-sm font-black text-atharx-ink disabled:opacity-60"
+                >
+                  {running ? "Running…" : "Execute Selection"}
+                </button>
+              )}
+            </div>
           </div>
           {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
 
@@ -126,6 +158,14 @@ export default function SelectionPage() {
                 <Stat label="Selected" value={detail.run.selected_count} />
                 <Stat label="Algorithm" value={detail.run.algorithm_version} />
               </div>
+              {detail.run.status === "LOCKED" && (
+                <p className="mt-3 rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-400">
+                  Pool locked at {new Date(detail.run.locked_at).toLocaleString()} — not yet drawn.
+                </p>
+              )}
+              <p className="mt-3 break-all font-mono text-[11px] text-slate-500">
+                Eligible pool hash (SHA-256): {detail.run.eligible_pool_hash}
+              </p>
               <table className="mt-4 w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-500">

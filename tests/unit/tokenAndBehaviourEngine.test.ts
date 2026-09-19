@@ -135,6 +135,7 @@ describe("behaviourEventService (qualifying-event pipeline)", () => {
       experienceTitle: "Capacity Test",
       experienceDescription: "Test only.",
       tokenCapacity: 1,
+      maxTokensPerCustomer: null,
       selectionMethod: "RANDOM_DRAW",
       winnerCount: 1,
       packageId: null,

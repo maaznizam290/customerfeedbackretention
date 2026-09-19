@@ -2,7 +2,14 @@ import { campaignRepository } from "@/repositories/campaignRepository";
 import { tokenRepository } from "@/repositories/tokenRepository";
 import { generateCampaignId } from "@/lib/ids";
 import { AppError } from "@/lib/errors";
+import { auditService } from "@/services/auditService";
 import type { Campaign, CampaignType, RewardCatalogType, SelectionMethod } from "@/types";
+
+export interface QualifyingCampaignLookup {
+  campaign: Campaign | null;
+  /** Human-readable reason no campaign qualified — null when campaign is non-null. */
+  reason: string | null;
+}
 
 const ALLOWED_TRANSITIONS: Record<Campaign["status"], Campaign["status"][]> = {
   DRAFT: ["ACTIVE"],
@@ -54,21 +61,55 @@ export const campaignService = {
   /**
    * The behaviour-event pipeline's core lookup: given a qualifying
    * behaviour and optional context (e.g. the package being purchased),
-   * find the single best-matching ACTIVE campaign that still has token
-   * capacity remaining. Returns null if nothing currently qualifies —
-   * that is a normal, expected outcome, not an error.
+   * find the single best-matching ACTIVE campaign that is within its
+   * configured date window and still has campaign- and customer-level
+   * token capacity remaining. Returns a null campaign with a human-
+   * readable `reason` when nothing currently qualifies — that is a
+   * normal, expected outcome, not an error, and the reason is exactly
+   * what the Event Simulator / audit trail surface to the caller.
    */
-  findQualifyingCampaign(behaviorId: string, context: { packageId?: string | null } = {}): Campaign | null {
+  findQualifyingCampaign(
+    behaviorId: string,
+    context: { packageId?: string | null; customerId?: string | null; now?: Date } = {}
+  ): QualifyingCampaignLookup {
     const candidates = campaignRepository.listActiveByBehaviour(behaviorId);
+    if (candidates.length === 0) {
+      return { campaign: null, reason: "No active campaign is configured for this behaviour." };
+    }
+
+    const now = context.now ?? new Date();
+    let lastReason: string | null = null;
+
     for (const campaign of candidates) {
-      if (campaign.packageId && campaign.packageId !== context.packageId) continue;
+      if (campaign.packageId && campaign.packageId !== context.packageId) {
+        lastReason = `Campaign ${campaign.campaignId} requires package ${campaign.packageId}.`;
+        continue;
+      }
+      if (new Date(campaign.startDate) > now) {
+        lastReason = `Campaign ${campaign.campaignId} has not started yet.`;
+        continue;
+      }
+      if (campaign.endDate && new Date(campaign.endDate) < now) {
+        lastReason = `Campaign ${campaign.campaignId} has expired.`;
+        continue;
+      }
       if (campaign.tokenCapacity !== null) {
         const issued = tokenRepository.countForCampaign(campaign.campaignId);
-        if (issued >= campaign.tokenCapacity) continue;
+        if (issued >= campaign.tokenCapacity) {
+          lastReason = `Campaign token limit reached (${campaign.tokenCapacity}).`;
+          continue;
+        }
       }
-      return campaign;
+      if (campaign.maxTokensPerCustomer !== null && context.customerId) {
+        const heldByCustomer = tokenRepository.countForCustomerInCampaign(campaign.campaignId, context.customerId);
+        if (heldByCustomer >= campaign.maxTokensPerCustomer) {
+          lastReason = `Customer token limit reached (${campaign.maxTokensPerCustomer} per customer).`;
+          continue;
+        }
+      }
+      return { campaign, reason: null };
     }
-    return null;
+    return { campaign: null, reason: lastReason ?? "No active campaign currently qualifies." };
   },
 
   tokensIssued(campaignId: string): number {
@@ -90,6 +131,7 @@ export const campaignService = {
     experienceTitle: string | null;
     experienceDescription: string | null;
     tokenCapacity: number | null;
+    maxTokensPerCustomer: number | null;
     selectionMethod: SelectionMethod;
     winnerCount: number;
     packageId: string | null;
@@ -97,11 +139,19 @@ export const campaignService = {
     endDate: string | null;
     status?: Campaign["status"];
   }): Campaign {
-    return campaignRepository.create({
+    const campaign = campaignRepository.create({
       ...input,
       campaignId: generateCampaignId(input.campaignCode),
       status: input.status ?? "DRAFT",
     });
+    auditService.record({
+      eventType: "CAMPAIGN_CREATED",
+      enterpriseId: campaign.enterpriseId,
+      campaignId: campaign.campaignId,
+      actor: "ADMIN",
+      afterValue: { name: campaign.name, status: campaign.status, tokenCapacity: campaign.tokenCapacity },
+    });
+    return campaign;
   },
 
   setStatus(campaignId: string, nextStatus: Campaign["status"]): Campaign {
@@ -113,6 +163,15 @@ export const campaignService = {
     if (campaign.status !== nextStatus && !allowed.includes(nextStatus)) {
       throw new InvalidCampaignTransitionError(campaign.status, nextStatus);
     }
-    return campaignRepository.setStatus(campaignId, nextStatus)!;
+    const updated = campaignRepository.setStatus(campaignId, nextStatus)!;
+    auditService.record({
+      eventType: "CAMPAIGN_STATUS_CHANGED",
+      enterpriseId: updated.enterpriseId,
+      campaignId: updated.campaignId,
+      actor: "ADMIN",
+      beforeValue: { status: campaign.status },
+      afterValue: { status: updated.status },
+    });
+    return updated;
   },
 };

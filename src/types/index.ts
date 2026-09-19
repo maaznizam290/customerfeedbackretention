@@ -20,7 +20,7 @@ export type RewardCatalogType =
 export type MilestoneStatus = "ACTIVE" | "INACTIVE";
 export type LuckyDrawStatus = "ACTIVE" | "CLOSED" | "COMPLETED";
 export type SpinStatus = "COMPLETED" | "FAILED";
-export type TokenStatus = "RESERVED" | "ISSUED" | "ELIGIBLE" | "SELECTED" | "EXPIRED" | "CANCELLED";
+export type TokenStatus = "RESERVED" | "ISSUED" | "ELIGIBLE" | "HOLD" | "SELECTED" | "EXPIRED" | "CANCELLED";
 export type BehaviourEventStatus = "RECEIVED" | "QUALIFIED" | "REJECTED";
 
 export interface Customer {
@@ -78,6 +78,7 @@ export interface Behaviour {
 export interface BehaviourEvent {
   id: number;
   eventId: string;
+  idempotencyKey: string | null;
   enterpriseId: string;
   customerId: string;
   subscriberId: string | null;
@@ -89,6 +90,7 @@ export interface BehaviourEvent {
   tokenId: string | null;
   coinReward: number;
   status: BehaviourEventStatus;
+  rejectionReason: string | null;
   createdAt: string;
 }
 
@@ -112,10 +114,12 @@ export interface SelectionRun {
   campaignId: string;
   eligibleCount: number;
   selectedCount: number;
+  eligiblePoolHash: string;
+  lockedAt: string;
   executedAt: string;
   executedBy: string;
   algorithmVersion: string;
-  status: "COMPLETED" | "FAILED";
+  status: "LOCKED" | "COMPLETED" | "FAILED";
   auditReference: string;
 }
 
@@ -255,6 +259,7 @@ export interface Campaign {
   experienceTitle: string | null;
   experienceDescription: string | null;
   tokenCapacity: number | null;
+  maxTokensPerCustomer: number | null;
   selectionMethod: SelectionMethod;
   winnerCount: number;
   packageId: string | null;
@@ -409,6 +414,40 @@ export interface SpinTransaction {
   nextSpinAvailableAt: string;
   createdAt: string;
   completedAt: string;
+}
+
+// The centralized audit trail (distinct from AnalyticsEvent below, which is
+// a product-analytics/UI-funnel feed, not a compliance record). Every
+// integrity-relevant action writes exactly one row here via auditService.
+export type AuditEventType =
+  | "CAMPAIGN_CREATED"
+  | "CAMPAIGN_STATUS_CHANGED"
+  | "BEHAVIOUR_CREATED"
+  | "EVENT_RECEIVED"
+  | "EVENT_REJECTED"
+  | "TOKEN_ISSUED"
+  | "TOKEN_HELD"
+  | "TOKEN_RELEASED"
+  | "TOKEN_CANCELLED"
+  | "ELIGIBLE_POOL_LOCKED"
+  | "SELECTION_STARTED"
+  | "WINNER_SELECTED"
+  | "WINNER_REVALIDATION_FAILED"
+  | "ALTERNATE_SELECTED";
+
+export interface AuditLogEntry {
+  id: number;
+  auditId: string; // AUD-000001
+  eventType: AuditEventType;
+  enterpriseId: string | null;
+  campaignId: string | null;
+  customerId: string | null;
+  tokenId: string | null;
+  actor: string; // ADMIN, SYSTEM, or a future admin-user id
+  beforeValue: Record<string, unknown> | null;
+  afterValue: Record<string, unknown> | null;
+  systemIdentifier: string;
+  createdAt: string;
 }
 
 export interface AnalyticsEvent {

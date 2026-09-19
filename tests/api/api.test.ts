@@ -16,6 +16,15 @@ async function get(pathname: string, headers: Record<string, string> = {}) {
   return { status: res.status, json: await res.json() };
 }
 
+async function patch(pathname: string, body: unknown, headers: Record<string, string> = {}) {
+  const res = await fetch(`${BASE_URL}${pathname}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, json: await res.json() };
+}
+
 describe("ATHARX API — health", () => {
   it("GET /health reports the service is up", async () => {
     const { status, json } = await get("/health");
@@ -312,5 +321,184 @@ describe("ATHARX API — Vault redemption over HTTP", () => {
     );
     expect(status).toBe(403);
     expect(json.error.code).toBe("INSUFFICIENT_COINS");
+  });
+});
+
+describe("ATHARX Engine layer over HTTP — events, campaigns, selection, tokens, audit", () => {
+  const unique = Date.now();
+  let customerId: string;
+
+  beforeAll(async () => {
+    const signup = await post("/customers/signup", {
+      fullName: "Engine Tester",
+      mobile: `+96895${String(600000 + (unique % 99999))}`,
+      email: `engine.api.test.${unique}@example.com`,
+      password: "Demo@123",
+      confirmPassword: "Demo@123",
+    });
+    customerId = signup.json.customer_id;
+  });
+
+  it("qualifying event idempotency: a repeated idempotency_key returns the original outcome, not a new one", async () => {
+    const key = `ENGINE-IDEMP-${unique}`;
+    const first = await post("/events/qualifying", {
+      enterprise_id: "OMT",
+      customer_id: customerId,
+      event_type: "RECHARGE",
+      amount: 5,
+      idempotency_key: key,
+    });
+    expect(first.status).toBe(201);
+    expect(first.json.is_replay).toBe(false);
+    expect(first.json.qualified).toBe(true);
+    expect(first.json.token_id).toBeTruthy();
+
+    const second = await post("/events/qualifying", {
+      enterprise_id: "OMT",
+      customer_id: customerId,
+      event_type: "RECHARGE",
+      amount: 5,
+      idempotency_key: key,
+    });
+    expect(second.status).toBe(200);
+    expect(second.json.is_replay).toBe(true);
+    expect(second.json.token_id).toBe(first.json.token_id);
+  });
+
+  it("a non-qualifying event returns a human-readable reason instead of a bare null", async () => {
+    const { status, json } = await post("/events/qualifying", {
+      enterprise_id: "OMT",
+      customer_id: customerId,
+      event_type: "RECHARGE",
+      amount: 1,
+      idempotency_key: `ENGINE-LOW-${unique}`,
+    });
+    expect(status).toBe(201);
+    expect(json.qualified).toBe(false);
+    expect(json.token_id).toBeNull();
+    expect(typeof json.reason).toBe("string");
+    expect(json.reason.length).toBeGreaterThan(0);
+  });
+
+  it("campaign creation accepts and returns max_tokens_per_customer", async () => {
+    const behaviourRes = await post("/admin/behaviours", {
+      name: `Engine Test Behaviour ${unique}`,
+      event_type: `ENGINE_TEST_EVENT_${unique}`,
+      description: "API test only.",
+    });
+    expect(behaviourRes.status).toBe(201);
+    const behaviorId = behaviourRes.json.behavior_id;
+
+    const campaignRes = await post("/admin/campaigns", {
+      campaign_code: `ENG${unique.toString().slice(-6)}`,
+      name: "Engine Test Campaign",
+      category: "Featured Experience",
+      campaign_type: "GENERAL",
+      behaviour_id: behaviorId,
+      reward_type: "EXPERIENCE",
+      reward_coins: 1,
+      selection_method: "RANDOM_DRAW",
+      winner_count: 1,
+      max_tokens_per_customer: 1,
+    });
+    expect(campaignRes.status).toBe(201);
+    const campaignId = campaignRes.json.campaign_id;
+    await patch(`/admin/campaigns/${campaignId}/status`, { status: "ACTIVE" });
+
+    const list = await get("/admin/campaigns");
+    const created = list.json.campaigns.find((c: { campaign_id: string }) => c.campaign_id === campaignId);
+    expect(created.max_tokens_per_customer).toBe(1);
+
+    // A second qualifying event for the same customer is rejected once the
+    // per-customer limit (1) is reached.
+    const eventType = `ENGINE_TEST_EVENT_${unique}`;
+    const first = await post("/events/qualifying", {
+      enterprise_id: "OMT",
+      customer_id: customerId,
+      event_type: eventType,
+      idempotency_key: `ENGINE-CAP-1-${unique}`,
+    });
+    expect(first.json.qualified).toBe(true);
+    expect(first.json.campaign_id).toBe(campaignId);
+
+    const second = await post("/events/qualifying", {
+      enterprise_id: "OMT",
+      customer_id: customerId,
+      event_type: eventType,
+      idempotency_key: `ENGINE-CAP-2-${unique}`,
+    });
+    expect(second.json.qualified).toBe(false);
+    expect(second.json.reason).toMatch(/Customer token limit reached/);
+  });
+
+  it("full selection lifecycle over HTTP: close -> lock (with integrity hash) -> execute -> audited", async () => {
+    const behaviourRes = await post("/admin/behaviours", {
+      name: `Selection Test Behaviour ${unique}`,
+      event_type: `SELECTION_TEST_EVENT_${unique}`,
+      description: "API test only.",
+    });
+    const behaviorId = behaviourRes.json.behavior_id;
+
+    const campaignRes = await post("/admin/campaigns", {
+      campaign_code: `SEL${unique.toString().slice(-6)}`,
+      name: "Selection Test Campaign",
+      category: "Featured Experience",
+      campaign_type: "GENERAL",
+      behaviour_id: behaviorId,
+      reward_type: "EXPERIENCE",
+      reward_coins: 1,
+      selection_method: "RANDOM_DRAW",
+      winner_count: 1,
+    });
+    const campaignId = campaignRes.json.campaign_id;
+    await patch(`/admin/campaigns/${campaignId}/status`, { status: "ACTIVE" });
+
+    const eventRes = await post("/events/qualifying", {
+      enterprise_id: "OMT",
+      customer_id: customerId,
+      event_type: `SELECTION_TEST_EVENT_${unique}`,
+      idempotency_key: `SELECTION-TOK-${unique}`,
+    });
+    expect(eventRes.json.qualified).toBe(true);
+
+    const closed = await patch(`/admin/campaigns/${campaignId}/status`, { status: "CLOSED" });
+    expect(closed.status).toBe(200);
+
+    const locked = await post(`/admin/selection/${campaignId}/lock`, {});
+    expect(locked.status).toBe(201);
+    expect(locked.json.eligible_pool_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(locked.json.eligible_count).toBe(1);
+
+    const detailAfterLock = await get(`/admin/selection/${campaignId}`);
+    expect(detailAfterLock.json.run.status).toBe("LOCKED");
+
+    const executed = await post(`/admin/selection/${campaignId}/execute`, {});
+    expect(executed.status).toBe(201);
+    expect(executed.json.results).toHaveLength(1);
+    expect(executed.json.results[0].token_id).toBe(eventRes.json.token_id);
+
+    const audit = await get(`/admin/audit?campaign_id=${campaignId}`);
+    const eventTypes = audit.json.entries.map((e: { event_type: string }) => e.event_type);
+    expect(eventTypes).toContain("ELIGIBLE_POOL_LOCKED");
+    expect(eventTypes).toContain("WINNER_SELECTED");
+  });
+
+  it("token exception management: HOLD then RELEASE a token via the admin endpoint, fully audited", async () => {
+    const tokens = await get(`/admin/tokens?customer_id=${customerId}&status=ISSUED`);
+    const tokenId = tokens.json.tokens[0]?.token_id;
+    expect(tokenId).toBeTruthy();
+
+    const held = await post(`/admin/tokens/${tokenId}/status`, { status: "HOLD" });
+    expect(held.status).toBe(200);
+    expect(held.json.status).toBe("HOLD");
+
+    const released = await post(`/admin/tokens/${tokenId}/status`, { status: "ISSUED" });
+    expect(released.status).toBe(200);
+    expect(released.json.status).toBe("ISSUED");
+
+    const audit = await get(`/admin/audit?customer_id=${customerId}`);
+    const eventTypes = audit.json.entries.map((e: { event_type: string }) => e.event_type);
+    expect(eventTypes).toContain("TOKEN_HELD");
+    expect(eventTypes).toContain("TOKEN_RELEASED");
   });
 });

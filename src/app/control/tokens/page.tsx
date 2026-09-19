@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/apiClient";
+import { apiFetch, ApiError } from "@/lib/apiClient";
 
 interface Token {
   token_id: string;
@@ -15,6 +15,7 @@ interface Token {
 
 const STATUS_COLORS: Record<string, string> = {
   ISSUED: "bg-sky-500/10 text-sky-400",
+  HOLD: "bg-amber-500/10 text-amber-400",
   SELECTED: "bg-emerald-500/10 text-emerald-400",
   EXPIRED: "bg-slate-500/10 text-slate-400",
   CANCELLED: "bg-red-500/10 text-red-400",
@@ -23,6 +24,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function TokensPage() {
   const [tokens, setTokens] = useState<Token[] | null>(null);
   const [filters, setFilters] = useState({ campaign_id: "", customer_id: "", status: "" });
+  const [error, setError] = useState<string | null>(null);
 
   function load() {
     const params = new URLSearchParams();
@@ -35,6 +37,16 @@ export default function TokensPage() {
   }
 
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function setStatus(tokenId: string, status: "ISSUED" | "HOLD" | "CANCELLED") {
+    setError(null);
+    try {
+      await apiFetch(`/admin/tokens/${tokenId}/status`, { method: "POST", body: JSON.stringify({ status }) });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not update token status.");
+    }
+  }
 
   return (
     <div>
@@ -69,7 +81,7 @@ export default function TokensPage() {
           className="admin-select max-w-[180px]"
         >
           <option value="">Any status</option>
-          {["ISSUED", "SELECTED", "EXPIRED", "CANCELLED"].map((s) => (
+          {["ISSUED", "HOLD", "SELECTED", "EXPIRED", "CANCELLED"].map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
@@ -80,6 +92,8 @@ export default function TokensPage() {
         </button>
       </form>
 
+      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+
       <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
         <table className="w-full text-left text-sm">
           <thead>
@@ -89,18 +103,19 @@ export default function TokensPage() {
               <th className="px-4 py-3 font-semibold">Campaign</th>
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Issued</th>
+              <th className="px-4 py-3 font-semibold">Exception Management</th>
             </tr>
           </thead>
           <tbody>
             {tokens === null ? (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
                   Loading…
                 </td>
               </tr>
             ) : tokens.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
                   No tokens match these filters yet.
                 </td>
               </tr>
@@ -118,6 +133,49 @@ export default function TokensPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-500">{new Date(t.issued_at).toLocaleString()}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      {t.status === "ISSUED" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setStatus(t.token_id, "HOLD")}
+                            className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-400"
+                          >
+                            Hold
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setStatus(t.token_id, "CANCELLED")}
+                            className="rounded-full bg-red-500/10 px-2.5 py-1 text-[11px] font-bold text-red-400"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                      {t.status === "HOLD" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setStatus(t.token_id, "ISSUED")}
+                            className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-400"
+                          >
+                            Release
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setStatus(t.token_id, "CANCELLED")}
+                            className="rounded-full bg-red-500/10 px-2.5 py-1 text-[11px] font-bold text-red-400"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                      {t.status !== "ISSUED" && t.status !== "HOLD" && (
+                        <span className="text-[11px] text-slate-600">—</span>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))
             )}

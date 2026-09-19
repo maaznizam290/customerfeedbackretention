@@ -86,3 +86,7 @@ export function generateVaultOfferId(): string {
 export function generateVaultRedemptionId(): string {
   return `VRD-${pad(nextSequence("vault_redemption"), 6)}`;
 }
+
+export function generateAuditId(): string {
+  return `AUD-${pad(nextSequence("audit_log"), 6)}`;
+}
